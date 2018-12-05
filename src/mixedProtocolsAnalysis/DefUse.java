@@ -1,0 +1,77 @@
+package mixedProtocolsAnalysis;
+
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
+
+import soot.Local;
+import soot.jimple.Stmt;
+
+/**
+ * definition and uses of a Local
+ * @author ishaq
+ *
+ */
+public class DefUse {
+	protected final Local var;
+	protected Node def;
+	protected Set<Local> copies = new HashSet<Local>();
+	
+	protected final Set<Node> uses = new HashSet<Node>();
+	
+	public DefUse(Local var, Stmt defn) {
+		this.var = var;
+		this.def = new Node(defn);
+	}
+	
+	public void addUse(Node use) {
+		this.uses.add(use);
+	}
+	
+	public Local getVar() {
+		return var;
+	}
+	
+	public Node getDef() {
+		return def;
+	}
+	
+	public void setDef(Node defn) {
+		this.def = defn;
+	}
+	
+	public Set<Node> getUses() {
+		return uses;
+	}
+	
+	public Set<Local> getCopies() {
+		return copies;
+	}
+	
+	public void markCopy(DefUse other) {
+		this.copies.add(other.var);
+		this.copies.addAll(other.copies);
+		removeUse(other.def);
+		this.uses.addAll(other.uses);
+	}
+	
+	@Override
+	public String toString() {
+		if(copies.size() > 0) {
+			return "DefUse<var = " + var + " copies: " + copies + ", def = " + def + ", uses = " + uses + ">";
+		}
+		return "DefUse<var = " + var + ", def = " + def + ", uses = " + uses + ">";
+		
+	}
+	
+	private void removeUse(Node key) {
+		Iterator<Node> iter = uses.iterator();
+		while(iter.hasNext()) {
+			Node dui = iter.next();
+			if(dui.id.equals(key.id)) {
+				iter.remove();
+			}
+		}
+	}
+	
+}
