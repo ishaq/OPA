@@ -114,30 +114,7 @@ public class Util {
 			throw new IllegalArgumentException("Unrecognized Def Stmt: " + stmt);
 		}	
 	}
-	
-	// Since we live in MPC world i.e. a single path through the program, node1 dominates node2
-	// if any of the successors of node1 reaches node2.
-	public static boolean mpc_doesNode1DominateNode2(Unit node1, Unit node2, BriefUnitGraph cfg) {
-		assert(node1.equals(node2) == false); // node1 and node2 shouldn't be the same object
-		List<Unit> node1Successors = cfg.getSuccsOf(node1);
-		Queue<Unit> worklist = new LinkedList<Unit>(node1Successors);
-		Set<Unit> worklistProcessed = new HashSet<Unit>();
-		while(!worklist.isEmpty()) {
-			Unit item = worklist.poll();
-			if(item.equals(node2)) {
-				return true;
-			}
-			worklistProcessed.add(item);
-			
-			List<Unit> itemSuccessors = cfg.getSuccsOf(item);
-			itemSuccessors.removeAll(worklistProcessed);
-			itemSuccessors.removeAll(worklist);
-			worklist.addAll(itemSuccessors);
-		}
 		
-		return false;
-	}
-	
 	public static Set<Local> getTransitiveClosureForDef(DefUse du, Map<Stmt, DefUse> defUses, Loop parentLoop) {
 		
 		// corner case:

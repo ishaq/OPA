@@ -6,6 +6,8 @@ import java.io.Writer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -14,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.Stack;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
@@ -176,6 +179,8 @@ public class Analysis extends BodyTransformer {
 				defUsesWithFixedArrayDefUse.putAll(defUses);
 				defUsesWithFixedArrayDefUse.putAll(arrayDefUses);
 				
+				defUsesWithFixedArrayDefUse = updateUseOrder(body, defUsesWithFixedArrayDefUse);
+				// TODO: conversion points and weights should be assigned according to subsumption
 				defUsesWithFixedArrayDefUse = adjustWeigthsOfDefUses(body, defUsesWithFixedArrayDefUse);
 				defUsesWithFixedArrayDefUse = assignLineNumbersToDefUses(body, defUsesWithFixedArrayDefUse);
 				
@@ -185,7 +190,6 @@ public class Analysis extends BodyTransformer {
 				
 				methodDefUses.put(m, defUsesWithFixedArrayDefUse);
 				methodNonParallelLoops.put(m, nonParallelLoops);
-				
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -547,6 +551,73 @@ public class Analysis extends BodyTransformer {
 				}
 			}
 		}
+		return defUses;
+	}
+	
+	public class UnitIndexComparator implements Comparator<Unit> {
+		@Override
+		public int compare(Unit o1, Unit o2) {
+			return nodeToIndex.get(o1).compareTo(nodeToIndex.get(o2));
+		}
+	}
+	
+	protected Map<Stmt, DefUse> updateUseOrder(Body body, Map<Stmt, DefUse> defUses) {
+		BriefUnitGraph cfg = new BriefUnitGraph(body);
+		Set<Stmt> keys = defUses.keySet();
+		for(Stmt k: keys) {
+			DefUse du = defUses.get(k);
+			Map<Stmt, Node> useMap = new HashMap<Stmt, Node>();
+			for(Node use: du.getUses()) {
+				useMap.put(use.id, use);
+			}
+			
+			Stack<Unit> worklist = new Stack<Unit>();
+			Set<Unit> processedWorklist = new HashSet<Unit>();
+			Set<Stmt> usesThatHaveBeenAssignedOrder = new HashSet<Stmt>();
+			
+			List<Unit> defSuccessors = cfg.getSuccsOf(du.def.id);
+			Collections.sort(defSuccessors, new UnitIndexComparator());
+			// push so that the closest (in terms distance in lines) gets pushed last
+			// so 1. reverse and then 2. push
+			Collections.reverse(defSuccessors);
+			for(Iterator<Unit> iter = defSuccessors.iterator(); iter.hasNext();) {
+				worklist.push(iter.next());
+			}
+			
+			int rank = 0;
+			while(!worklist.isEmpty()) {
+				Unit item = worklist.pop();
+				processedWorklist.add(item);
+				Node use = useMap.get((Stmt)item);
+				if(use != null) {
+					use.setUseOrder(rank);
+					usesThatHaveBeenAssignedOrder.add((Stmt)use.id);
+					
+					if(usesThatHaveBeenAssignedOrder.size() == du.getUses().size()) {
+						// found rank for all uses
+						break;
+					}
+					
+					rank += 1;
+				}
+				
+				List<Unit> successors = cfg.getSuccsOf(item);
+				Collections.sort(successors, new UnitIndexComparator());
+				// push so that the closest (in terms distance in lines) gets pushed last
+				// so 1. reverse and then 2. push
+				Collections.reverse(successors);
+				for(Iterator<Unit> iter = successors.iterator(); iter.hasNext();) {
+					Unit currSuccessor = iter.next();
+					if(processedWorklist.contains(currSuccessor) || worklist.contains(currSuccessor)) {
+						continue;
+					}
+					worklist.push(currSuccessor);
+				}
+			}
+			
+			assert(usesThatHaveBeenAssignedOrder.size() == du.getUses().size());
+		}
+		
 		return defUses;
 	}
 

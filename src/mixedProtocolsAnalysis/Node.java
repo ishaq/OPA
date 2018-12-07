@@ -449,6 +449,14 @@ public class Node {
 	 * represents a "def" node, this field is invalid
 	 */
 	protected int conversionWeight = -1;
+	
+	/**
+	 * represents rank of a use (if this node is a "use" node.).
+	 * 
+	 * use orders are used to sort the use nodes to correctly identify min-cut for conversions and
+	 * compute subsumption as appropriate
+	 */
+	protected int useOrder = -1; 
 
 	/**
 	 * the instruction before which conversion (if any) for def-use edge should
@@ -497,6 +505,14 @@ public class Node {
 	public Stmt getConversionPoint() {
 		return conversionPoint;
 	}
+	
+	public int getUseOrder() {
+		return useOrder;
+	}
+
+	public void setUseOrder(int useOrder) {
+		this.useOrder = useOrder;
+	}
 
 	public void setConversionPoint(Stmt conversionPoint) {
 		this.conversionPoint = conversionPoint;
@@ -511,7 +527,8 @@ public class Node {
 	}
 
 	public String toString() {
-		return "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + ", weight = " + weight
+		return "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + 
+				", order: " + useOrder + ", weight = " + weight
 				+ ", conversionWeight = " + conversionWeight + ")";
 
 	}
