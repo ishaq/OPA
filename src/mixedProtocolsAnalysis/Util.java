@@ -1,13 +1,17 @@
 package mixedProtocolsAnalysis;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.Stack;
 
 import soot.ArrayType;
 import soot.Local;
@@ -25,6 +29,25 @@ import soot.jimple.toolkits.annotation.logic.Loop;
 import soot.shimple.PhiExpr;
 import soot.toolkits.graph.BriefUnitGraph;
 import soot.toolkits.scalar.ValueUnitPair;
+
+
+/**
+ * this class is a dirty hack that I made because Soot does not reliably return the 'fallthrough' node
+ * as first node in `getSuccsOf`, instead of a hack like this, I should really write my own version
+ * of `getSuccsOf`
+ * @author ishaq
+ *
+ */
+class UnitIndexComparator implements Comparator<Unit> {
+	Map<Unit, Integer> nodeToIndex = null;
+	public UnitIndexComparator(Map<Unit, Integer> nodeToIndex) {
+		this.nodeToIndex = nodeToIndex;
+	}
+	@Override
+	public int compare(Unit o1, Unit o2) {
+		return nodeToIndex.get(o1).compareTo(nodeToIndex.get(o2));
+	}
+}
 
 public class Util {
 	public static boolean isArrayDefStatement(Stmt stmt) {
@@ -290,5 +313,54 @@ public class Util {
 		} while(newVariables.size() > 0);
 		
 		return variablesToIgnore;
+	}
+	
+	/**
+	 * returns total ordering of units from `fromUnit` (`fromUnit` is not included)
+	 * @param fromUnit start building list of successors from here
+	 * @param cfg the brief unit graph that we use to build the ordering
+	 * @return ordered list, suitable for use in subsumption (see paper).
+	 */
+	public static List<Unit> getTotalOrdering(Unit fromUnit, BriefUnitGraph cfg, Map<Unit, Integer> nodeToIndex) {
+		UnitIndexComparator comparator = new UnitIndexComparator(nodeToIndex);
+		Stack<Unit> worklist = new Stack<Unit>();
+		List<Unit> succsList = new LinkedList<Unit>();
+		// NOTE: the call to sort is a dirty hack because 'getSuccsOf' does not always return
+		// the following node as the first successor (it should, no idea why it doesn't).
+		//  we create a  list of successors sorted so that immediately following node is the
+		// first node and any jump locations appear after it.
+		// we reverse the so that the farther node (a branch target) is first and 
+		// nearer node is at the end
+		// then we push. this makes the farther node go deeper in the stack
+		List<Unit> fromSuccessors = cfg.getSuccsOf(fromUnit);
+		Collections.sort(fromSuccessors, comparator);
+		Collections.reverse(fromSuccessors);
+		for(Iterator<Unit> iter = fromSuccessors.iterator(); iter.hasNext();) {
+			worklist.push(iter.next());
+		}
+		
+		while(!worklist.isEmpty()) {
+			Unit item = worklist.pop();
+			succsList.add(item);
+			
+			// NOTE: the call to sort is a dirty hack because 'getSuccsOf' does not always return
+			// the following node as the first successor (it should, no idea why it doesn't).
+			//  we create a  list of successors sorted so that immediately following node is the
+			// first node and any jump locations appear after it.
+			// we reverse the so that the farther node (a branch target) is first and 
+			// nearer node is at the end
+			// then we push. this makes the farther node go deeper in the stack
+			List<Unit> successors = cfg.getSuccsOf(item);
+			Collections.sort(successors, comparator);
+			Collections.reverse(successors);
+			for(Iterator<Unit> iter = successors.iterator(); iter.hasNext();) {
+				Unit currSuccessor = iter.next();
+				if(succsList.contains(currSuccessor) || worklist.contains(currSuccessor)) {
+					continue;
+				}
+				worklist.push(currSuccessor);
+			}
+		}
+		return succsList;
 	}
 }

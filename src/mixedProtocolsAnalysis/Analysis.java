@@ -179,7 +179,7 @@ public class Analysis extends BodyTransformer {
 				defUsesWithFixedArrayDefUse.putAll(defUses);
 				defUsesWithFixedArrayDefUse.putAll(arrayDefUses);
 				
-				defUsesWithFixedArrayDefUse = updateUseOrder(body, defUsesWithFixedArrayDefUse);
+				defUsesWithFixedArrayDefUse = updateUseOrder(body, defUsesWithFixedArrayDefUse, nodeToIndex);
 				// TODO: conversion points and weights should be assigned according to subsumption
 				defUsesWithFixedArrayDefUse = adjustWeigthsOfDefUses(body, defUsesWithFixedArrayDefUse);
 				defUsesWithFixedArrayDefUse = assignLineNumbersToDefUses(body, defUsesWithFixedArrayDefUse);
@@ -554,14 +554,8 @@ public class Analysis extends BodyTransformer {
 		return defUses;
 	}
 	
-	public class UnitIndexComparator implements Comparator<Unit> {
-		@Override
-		public int compare(Unit o1, Unit o2) {
-			return nodeToIndex.get(o1).compareTo(nodeToIndex.get(o2));
-		}
-	}
-	
-	protected Map<Stmt, DefUse> updateUseOrder(Body body, Map<Stmt, DefUse> defUses) {
+	protected static Map<Stmt, DefUse> updateUseOrder(Body body, Map<Stmt, DefUse> defUses, 
+			Map<Unit, Integer> nodeToIndex) {
 		BriefUnitGraph cfg = new BriefUnitGraph(body);
 		Set<Stmt> keys = defUses.keySet();
 		for(Stmt k: keys) {
@@ -571,51 +565,32 @@ public class Analysis extends BodyTransformer {
 				useMap.put(use.id, use);
 			}
 			
-			Stack<Unit> worklist = new Stack<Unit>();
-			Set<Unit> processedWorklist = new HashSet<Unit>();
-			Set<Stmt> usesThatHaveBeenAssignedOrder = new HashSet<Stmt>();
+			Set<Node> usesThatHaveBeenAssignedOrder = new HashSet<Node>();
+			List<Unit> defSuccessors = Util.getTotalOrdering(du.def.id, cfg, nodeToIndex);
 			
-			List<Unit> defSuccessors = cfg.getSuccsOf(du.def.id);
-			Collections.sort(defSuccessors, new UnitIndexComparator());
-			// push so that the closest (in terms distance in lines) gets pushed last
-			// so 1. reverse and then 2. push
-			Collections.reverse(defSuccessors);
-			for(Iterator<Unit> iter = defSuccessors.iterator(); iter.hasNext();) {
-				worklist.push(iter.next());
-			}
-			
-			int rank = 0;
-			while(!worklist.isEmpty()) {
-				Unit item = worklist.pop();
-				processedWorklist.add(item);
-				Node use = useMap.get((Stmt)item);
+			int order = 0;
+			int indx = 0;
+			Iterator<Unit> iter = defSuccessors.iterator();
+			//System.out.println(k.toString());
+			while(iter.hasNext()) {
+				Unit s = iter.next();
+				Node use = useMap.get((Stmt)s);
 				if(use != null) {
-					use.setUseOrder(rank);
-					usesThatHaveBeenAssignedOrder.add((Stmt)use.id);
+					//System.out.println("\t" + indx + ": " + order + ": " + s);
+					use.setUseOrder(order);
+					usesThatHaveBeenAssignedOrder.add(use);
 					
-					if(usesThatHaveBeenAssignedOrder.size() == du.getUses().size()) {
+					if(usesThatHaveBeenAssignedOrder.equals(du.getUses())) {
 						// found rank for all uses
 						break;
 					}
 					
-					rank += 1;
+					order += 1;
 				}
-				
-				List<Unit> successors = cfg.getSuccsOf(item);
-				Collections.sort(successors, new UnitIndexComparator());
-				// push so that the closest (in terms distance in lines) gets pushed last
-				// so 1. reverse and then 2. push
-				Collections.reverse(successors);
-				for(Iterator<Unit> iter = successors.iterator(); iter.hasNext();) {
-					Unit currSuccessor = iter.next();
-					if(processedWorklist.contains(currSuccessor) || worklist.contains(currSuccessor)) {
-						continue;
-					}
-					worklist.push(currSuccessor);
-				}
+				indx += 1;
 			}
 			
-			assert(usesThatHaveBeenAssignedOrder.size() == du.getUses().size());
+			assert(usesThatHaveBeenAssignedOrder.equals(du.getUses()));
 		}
 		
 		return defUses;
