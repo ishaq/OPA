@@ -1,8 +1,8 @@
 package mixedProtocolsAnalysis;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -14,8 +14,10 @@ import java.util.Set;
 import java.util.Stack;
 
 import soot.ArrayType;
+import soot.Body;
 import soot.Local;
 import soot.Unit;
+import soot.UnitBox;
 import soot.Value;
 import soot.jimple.ArrayRef;
 import soot.jimple.AssignStmt;
@@ -27,27 +29,8 @@ import soot.jimple.Stmt;
 import soot.jimple.UnopExpr;
 import soot.jimple.toolkits.annotation.logic.Loop;
 import soot.shimple.PhiExpr;
-import soot.toolkits.graph.BriefUnitGraph;
 import soot.toolkits.scalar.ValueUnitPair;
 
-
-/**
- * this class is a dirty hack that I made because Soot does not reliably return the 'fallthrough' node
- * as first node in `getSuccsOf`, instead of a hack like this, I should really write my own version
- * of `getSuccsOf`
- * @author ishaq
- *
- */
-class UnitIndexComparator implements Comparator<Unit> {
-	Map<Unit, Integer> nodeToIndex = null;
-	public UnitIndexComparator(Map<Unit, Integer> nodeToIndex) {
-		this.nodeToIndex = nodeToIndex;
-	}
-	@Override
-	public int compare(Unit o1, Unit o2) {
-		return nodeToIndex.get(o1).compareTo(nodeToIndex.get(o2));
-	}
-}
 
 public class Util {
 	public static boolean isArrayDefStatement(Stmt stmt) {
@@ -318,22 +301,23 @@ public class Util {
 	/**
 	 * returns total ordering of units from `fromUnit` (`fromUnit` is not included)
 	 * @param fromUnit start building list of successors from here
-	 * @param cfg the brief unit graph that we use to build the ordering
+	 * @param unit to successor map
 	 * @return ordered list, suitable for use in subsumption (see paper).
 	 */
-	public static List<Unit> getTotalOrdering(Unit fromUnit, BriefUnitGraph cfg, Map<Unit, Integer> nodeToIndex) {
-		UnitIndexComparator comparator = new UnitIndexComparator(nodeToIndex);
+	public static List<Unit> getTotalOrdering(Unit fromUnit, Body body) {
+		// NOTE: very important to build unit-to-successors map here (instead of in the caller)
+		// Reason: if you build it in the caller and pass it via a parameter here, the order of 
+		// successors is altered.
+		Map<Unit, List<Unit>> succsMap = buildUnitToSuccessorsMap(body);
+		
 		Stack<Unit> worklist = new Stack<Unit>();
 		List<Unit> succsList = new LinkedList<Unit>();
-		// NOTE: the call to sort is a dirty hack because 'getSuccsOf' does not always return
-		// the following node as the first successor (it should, no idea why it doesn't).
-		//  we create a  list of successors sorted so that immediately following node is the
-		// first node and any jump locations appear after it.
-		// we reverse the so that the farther node (a branch target) is first and 
-		// nearer node is at the end
+		
+		
+		// successors list is ordered s.t. the fall-through node is the very first.
+		// we reverse the so that the 'farther' node (a branch target) is first
 		// then we push. this makes the farther node go deeper in the stack
-		List<Unit> fromSuccessors = cfg.getSuccsOf(fromUnit);
-		Collections.sort(fromSuccessors, comparator);
+		List<Unit> fromSuccessors = getSuccsOf(fromUnit, succsMap);
 		Collections.reverse(fromSuccessors);
 		for(Iterator<Unit> iter = fromSuccessors.iterator(); iter.hasNext();) {
 			worklist.push(iter.next());
@@ -343,15 +327,10 @@ public class Util {
 			Unit item = worklist.pop();
 			succsList.add(item);
 			
-			// NOTE: the call to sort is a dirty hack because 'getSuccsOf' does not always return
-			// the following node as the first successor (it should, no idea why it doesn't).
-			//  we create a  list of successors sorted so that immediately following node is the
-			// first node and any jump locations appear after it.
-			// we reverse the so that the farther node (a branch target) is first and 
-			// nearer node is at the end
+			// successors list is ordered s.t. the fall-through node is the very first.
+			// we reverse the so that the 'farther' node (a branch target) is first
 			// then we push. this makes the farther node go deeper in the stack
-			List<Unit> successors = cfg.getSuccsOf(item);
-			Collections.sort(successors, comparator);
+			List<Unit> successors = getSuccsOf(item, succsMap);
 			Collections.reverse(successors);
 			for(Iterator<Unit> iter = successors.iterator(); iter.hasNext();) {
 				Unit currSuccessor = iter.next();
@@ -362,5 +341,67 @@ public class Util {
 			}
 		}
 		return succsList;
+	}
+	
+	/**
+	 * builds a map for each units successors. it guarantees that 'fall through' node (when one 
+	 * exists) is always the first successor in the successors list.
+	 * 
+	 * this code is based on BriefUnitGraph. I wrote it because BriefUnitGraph doesn't make 
+	 * any guarantees for order of getSuccsOf (just that same order would always be 
+	 * returned). We wanted a guarantee that 'fall through' instruction
+	 * is always the first successor.
+	 * 
+	 * @param b Body of the function
+	 * @return map keys are units, values are successors of the unit
+	 */
+	public static Map<Unit, List<Unit>> buildUnitToSuccessorsMap(Body b) {
+		Map<Unit, List<Unit>> unitToSuccs = new HashMap<Unit, List<Unit>>();
+		
+		Iterator<Unit> unitIt = b.getUnits().iterator();
+		Unit currentUnit = null;
+		Unit nextUnit = null;
+		
+		nextUnit = unitIt.hasNext() ? (Unit) unitIt.next() : null;
+
+		while (nextUnit != null) {
+			currentUnit = nextUnit;
+			nextUnit = unitIt.hasNext() ? (Unit) unitIt.next() : null;
+			
+			ArrayList<Unit> successors = new ArrayList<Unit>();
+			if(currentUnit.fallsThrough()) {
+				if(nextUnit != null) {
+					successors.add(nextUnit);
+				}
+			}
+			
+			if (currentUnit.branches()) {
+				for (UnitBox targetBox : currentUnit.getUnitBoxes()) {
+					Unit target = targetBox.getUnit();
+					// Arbitrary bytecode can branch to the same
+					// target it falls through to, so we screen for duplicates:
+					if (!successors.contains(target)) {
+						successors.add(target);
+					}
+				}
+			}
+
+			// Store away successors
+			if (!successors.isEmpty()) {
+				successors.trimToSize();
+				unitToSuccs.put(currentUnit, successors);
+			}
+			
+		}
+		
+		return unitToSuccs;
+	}
+	
+	public static List<Unit> getSuccsOf(Unit unit, Map<Unit, List<Unit>> succsMap) {
+		List<Unit> succs = succsMap.get(unit);
+		if(succs == null) {
+			return Collections.emptyList();
+		}
+		return succs;
 	}
 }

@@ -556,7 +556,6 @@ public class Analysis extends BodyTransformer {
 	
 	protected static Map<Stmt, DefUse> updateUseOrder(Body body, Map<Stmt, DefUse> defUses, 
 			Map<Unit, Integer> nodeToIndex) {
-		BriefUnitGraph cfg = new BriefUnitGraph(body);
 		Set<Stmt> keys = defUses.keySet();
 		for(Stmt k: keys) {
 			DefUse du = defUses.get(k);
@@ -566,10 +565,9 @@ public class Analysis extends BodyTransformer {
 			}
 			
 			Set<Node> usesThatHaveBeenAssignedOrder = new HashSet<Node>();
-			List<Unit> defSuccessors = Util.getTotalOrdering(du.def.id, cfg, nodeToIndex);
+			List<Unit> defSuccessors = Util.getTotalOrdering(du.def.id, body);
 			
 			int order = 0;
-			int indx = 0;
 			Iterator<Unit> iter = defSuccessors.iterator();
 			//System.out.println(k.toString());
 			while(iter.hasNext()) {
@@ -587,7 +585,6 @@ public class Analysis extends BodyTransformer {
 					
 					order += 1;
 				}
-				indx += 1;
 			}
 			
 			assert(usesThatHaveBeenAssignedOrder.equals(du.getUses()));
