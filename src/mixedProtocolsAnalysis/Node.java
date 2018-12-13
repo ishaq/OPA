@@ -93,7 +93,11 @@ public class Node {
 		ADD(201), AND(202), CMP(203), DIV(204), EQ(205), GE(206), GT(207), LE(208), LT(209), MUL(210), NE(211), OR(
 				212), REM(213), SHL(214), SHR(215), SUB(216), USHR(217), XOR(218), NEG(219), LOCAL(220),
 		// AbstractShimpleValueSwitch
-		MUX(301);
+		MUX(301),
+		
+		// Special nodes
+		IN(1000), OUT(1001);
+		
 		private final int value;
 
 		private NodeType(int value) {
@@ -120,7 +124,9 @@ public class Node {
 		}
 
 		public void caseInvokeStmt(InvokeStmt stmt) {
-			defaultCase(stmt);
+			NodeValueSwitch visitor = new NodeValueSwitch();
+			stmt.getInvokeExpr().apply(visitor);
+			nodeType = visitor.getNodeType();
 		}
 
 		public void caseAssignStmt(AssignStmt stmt) {
@@ -305,10 +311,22 @@ public class Node {
 		}
 
 		public void caseInterfaceInvokeExpr(InterfaceInvokeExpr v) {
-			// FIXME: this check should be improved. Right now it's implemented just to 
-			// get the first cycle done.
-			if(v.getMethodRef().getSignature().equals("<Multiplex: int MUX(int,int,boolean)>")) {
+			// FIXME: these checks should be improved. instead of comparing to hardcoded signatures,
+			// these should do something smarter
+			if(v.getMethodRef().getSignature().equals("<MPCAnnotation: int MUX(int,int,boolean)>")) {
 				nodeType = NodeType.MUX;
+				return;
+			}
+			else if(v.getMethod().getSignature().equals("<MPCAnnotation: void IN(int)>") 
+					|| v.getMethod().getSignature().equals("<MPCAnnotation: void IN(int[])>") 
+					|| v.getMethod().getSignature().equals("<MPCAnnotation: void IN(int[][])>")) {
+				nodeType = NodeType.IN;
+				return;
+			}
+			else if(v.getMethod().getSignature().equals("<MPCAnnotation: void OUT(int)>")
+					|| v.getMethod().getSignature().equals("<MPCAnnotation: void OUT(int[])>")
+					|| v.getMethod().getSignature().equals("<MPCAnnotation: void OUT(int[][])>")) {
+				nodeType = NodeType.OUT;
 				return;
 			}
 			defaultCase(v);
@@ -467,7 +485,7 @@ public class Node {
 	
 	/**
 	 * is this node parallelizable. A node is parallelizable if it is inside a loop 
-	 * and iterations of that loop are independant of each other
+	 * and iterations of that loop are independent of each other
 	 */
 	protected boolean parallelizable = false;
 

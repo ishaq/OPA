@@ -3,3 +3,8 @@
 
 # log files
 *.log
+
+# other generated files
+.DS_Store
+*.json
+*.shimple

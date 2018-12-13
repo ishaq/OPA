@@ -171,7 +171,6 @@ public class Analysis extends BodyTransformer {
 				// TODO: scan body for call instructions, throw an exception if there is one
 				
 				Map<Stmt, DefUse> defUses = collectDefUses(body);
-				defUses = doCopyPropagation(defUses);
 				Map<Stmt, DefUse> arrayDefUses = collectArrayDefUses(body);
 				
 				// merge update def-use map
@@ -179,8 +178,8 @@ public class Analysis extends BodyTransformer {
 				defUsesWithFixedArrayDefUse.putAll(defUses);
 				defUsesWithFixedArrayDefUse.putAll(arrayDefUses);
 				
+				defUsesWithFixedArrayDefUse = doCopyPropagation(defUsesWithFixedArrayDefUse);
 				defUsesWithFixedArrayDefUse = updateUseOrder(body, defUsesWithFixedArrayDefUse, nodeToIndex);
-				// TODO: conversion points and weights should be assigned according to subsumption
 				defUsesWithFixedArrayDefUse = adjustWeigthsOfDefUses(body, defUsesWithFixedArrayDefUse);
 				defUsesWithFixedArrayDefUse = assignLineNumbersToDefUses(body, defUsesWithFixedArrayDefUse);
 				
@@ -343,24 +342,9 @@ public class Analysis extends BodyTransformer {
 					Local useL = Util.getLocalCorrespondingToArrayUseStmt((Stmt) item);
 					Local defL = Util.getLocalCorrespondingToArrayDefStmt((Stmt) item);
 					if (useL != null) {
-						if (localsToMatch.contains(useL)) {
-							// we don't record use for copies
-							if(Util.isArrayCopyStatment((Stmt)item) == false) {
-								// this is not a copy
+						if (localsToMatch.contains(useL)) {	
 								Node use = new Node((Stmt) item);
 								thisDefUse.addUse(use);
-							}
-							
-							if (defL != null) {
-								// if we are also defining a new array from
-								// the use of the current array, then the new array
-								// is a copy (or sub-array) of this one
-								handledArrayDefs.add(item);
-								localsToMatch.add(defL);
-								thisDefUse.copies.add(defL);
-							}
-							
-
 						}
 					} else if (defL != null) {
 						if (localsToMatch.contains(defL)) {
@@ -378,7 +362,6 @@ public class Analysis extends BodyTransformer {
 						worklist.add(currentSuccessor);
 					}
 				}
-
 			}
 		}
 		
