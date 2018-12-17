@@ -610,10 +610,23 @@ public class Analysis extends BodyTransformer {
 		return defUses;
 	}
 	
+	public static class DefUseComparator implements Comparator<DefUse> {
+		Map<Unit, Integer> nodeToIndex;
+		DefUseComparator(Map<Unit, Integer> nodeToIndex) {
+			this.nodeToIndex = nodeToIndex;
+		}
+		@Override
+		public int compare(DefUse o1, DefUse o2) {
+			return nodeToIndex.get(o1.def.id).compareTo(nodeToIndex.get(o2.def.id));
+		}
+	}
+	
 	protected static Map<Stmt, DefUse> removeUsesThatOccurAfterRedefinition(Body body, Map<Stmt, DefUse> defUses,
 			Map<Unit, Integer> nodeToIndex) {
 		
 		Map<Local, List<DefUse>> varDefUseMap = new HashMap<Local, List<DefUse>>();
+		
+		DefUseComparator comp = new DefUseComparator(nodeToIndex);
 		
 		// build the map
 		for(Stmt key: defUses.keySet()) {
@@ -623,20 +636,7 @@ public class Analysis extends BodyTransformer {
 				existingList = new ArrayList<DefUse>();
 				varDefUseMap.put(du.var, existingList);
 			}
-			// insertion sort
-			
-			
-			int index = 0;
-			for(int i = 0; i < existingList.size(); i++) {
-				DefUse existingDefUse = existingList.get(i);
-				if(nodeToIndex.get(existingDefUse.def.id) > nodeToIndex.get(du.def.id)) {
-					// if the existing def occurs *after* the current def, break
-					break;
-				}
-				// else
-				index = i;
-			}
-			existingList.add(index, du);
+			existingList.add(du);
 		}
 		
 		// go through the map
@@ -647,6 +647,8 @@ public class Analysis extends BodyTransformer {
 			}
 			
 			// if multiple defs for same var
+			Collections.sort(defUseList, comp);
+			
 			for(int i = 1; i < defUseList.size(); i++) {
 				// remove all uses of the later def (that occur after the later def).
 				DefUse prevDefUse = defUseList.get(i-1);
