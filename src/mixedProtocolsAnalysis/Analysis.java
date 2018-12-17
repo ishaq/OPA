@@ -601,15 +601,17 @@ public class Analysis extends BodyTransformer {
 				varDefUseMap.put(du.var, existingList);
 			}
 			// insertion sort
+			
+			
 			int index = 0;
-			while(index < (existingList.size() - 1)) {
-				DefUse existingDefUse = existingList.get(index);
+			for(int i = 0; i < existingList.size(); i++) {
+				DefUse existingDefUse = existingList.get(i);
 				if(nodeToIndex.get(existingDefUse.def.id) > nodeToIndex.get(du.def.id)) {
 					// if the existing def occurs *after* the current def, break
 					break;
 				}
-				// otherwise increment index (the existing def index is less, we want to insert this one after it
-				index += 1;
+				// else
+				index = i;
 			}
 			existingList.add(index, du);
 		}
