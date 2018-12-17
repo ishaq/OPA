@@ -6,6 +6,8 @@ import java.io.Writer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -76,6 +78,7 @@ public class Analysis extends BodyTransformer {
 			};
 			obj.add("id", ctx.serialize(src.getId(), stmtType.getType()));
 			obj.addProperty("weight", src.getWeight());
+			obj.addProperty("arrayWeight", src.getArrayWeight());
 			obj.addProperty("line_number", src.getLineNumber());
 			TypeToken<Node.NodeType> nodeTypeType = new TypeToken<Node.NodeType>() {
 			};
@@ -83,6 +86,7 @@ public class Analysis extends BodyTransformer {
 			obj.addProperty("conversion_weight", src.getConversionWeight());
 			obj.add("conversion_point", ctx.serialize(src.getConversionPoint(), stmtType.getType()));
 			obj.addProperty("parallelizable", src.isParallelizable());
+			obj.addProperty("order", src.getUseOrder());
 			return obj;
 		}
 	}
@@ -101,7 +105,14 @@ public class Analysis extends BodyTransformer {
 			obj.add("def", ctx.serialize(src.getDef(), nodeType.getType()));
 			TypeToken<List<Node>> nodesListType = new TypeToken<List<Node>>() {
 			};
-			obj.add("uses", ctx.serialize(src.getUses(), nodesListType.getType()));
+			//obj.add("uses", ctx.serialize(src.getUses(), nodesListType.getType()));
+			
+			// sort uses by order
+			List<Node> uses = new ArrayList<Node>();
+			uses.addAll(src.uses);
+			Collections.sort(uses, new UseComparator());
+			
+			obj.add("uses", ctx.serialize(uses, nodesListType.getType()));
 			return obj;
 		}
 	}
@@ -118,6 +129,13 @@ public class Analysis extends BodyTransformer {
 			};
 			obj.add("exits", ctx.serialize(src.getLoopExits(), stmtListType.getType()));
 			return obj;
+		}
+	}
+	
+	public class UseComparator implements Comparator<Node> {
+		@Override
+		public int compare(Node o1, Node o2) {
+			return Integer.compare(o1.useOrder, o2.useOrder);
 		}
 	}
 
@@ -198,7 +216,7 @@ public class Analysis extends BodyTransformer {
 			e.printStackTrace();
 		}
 	}
-
+	
 	public void showResult() {
 
 		if (!(methodDefUses.keySet().size() > 0)) {

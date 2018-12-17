@@ -16,7 +16,6 @@ public class Tests extends TestCase {
 
 	@Test
 	public void test2() {
-		// TODO: if optimization line is commented, this should be decremented
 		String[] args = new String[19];
 		int largeValue = 1000000;
 		// -app causes Soot to run in "application mode", i.e., analysis scope is application 
@@ -44,8 +43,7 @@ public class Tests extends TestCase {
 		args[i++] = "-f";
 		//args[3] = "J";
 		args[i++] = "shimple";
-		// TODO: comment the following line?
-		args[i++] = "-O"; // Optmization causes Def/Uses to throw NullPointerException in case a PhiNode gets collapsed, therefore turning it off
+		args[i++] = "-O";
 		// -cp specifies the class path. Must include a path to the application classes, and the rt.jar
 		args[i++] = "-cp";
 		args[i++] = "./src/programs/biometric/:"+RT_HOME;
