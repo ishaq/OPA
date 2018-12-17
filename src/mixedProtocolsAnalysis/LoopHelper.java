@@ -10,7 +10,9 @@ import java.util.SortedSet;
 
 import soot.Body;
 import soot.Local;
+import soot.Unit;
 import soot.Value;
+import soot.jimple.AssignStmt;
 import soot.jimple.ConditionExpr;
 import soot.jimple.GeExpr;
 import soot.jimple.GtExpr;
@@ -164,12 +166,31 @@ public class LoopHelper {
 				ConditionExpr cond = (ConditionExpr) ifStmt.getCondition();
 				Set<Local> condVariables = Util.getVariables(cond);
 				thisLoopCounterVars.addAll(condVariables);
+				
+				for(Local l1: condVariables) {
+					Unit u = this.localDefs.getDefsOf(l1).get(0);
+					AssignStmt defStatement = (AssignStmt)u;
+					Set<Local> defVariables = Util.getVariables(defStatement.getRightOp());
+					thisLoopCounterVars.addAll(defVariables);
+				}
 				break;
 			}
 		}
 		
 		thisLoopCounterVars = Util.updateVariablesToIgnore(thisLoopCounterVars, defUses, l);
 		return thisLoopCounterVars;
+	}
+	
+	public Set<Stmt> getAllLoopCounterVariableDefStmts(Map<Stmt, DefUse> defUses)  throws UnsupportedFeatureException {
+		Set<Stmt> loopCounterVarDefs = new HashSet<Stmt>();
+		for(Loop l: this.loopsTree) {
+			Set<Local> vars = getLoopCounterVariables(l, defUses);
+			for(Local v: vars) {
+				Unit u = localDefs.getDefsOf(v).get(0);
+				loopCounterVarDefs.add((Stmt)u);
+			}
+		}
+		return loopCounterVarDefs;
 	}
 	
 	public LoopNestTree getLoopsTree() {

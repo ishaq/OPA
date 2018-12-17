@@ -174,19 +174,24 @@ public class Analysis extends BodyTransformer {
 				Map<Stmt, DefUse> defUsesWithFixedArrayDefUse = new HashMap<Stmt, DefUse>();
 				defUsesWithFixedArrayDefUse.putAll(defUses);
 				defUsesWithFixedArrayDefUse.putAll(arrayDefUses);
+				defUses = defUsesWithFixedArrayDefUse;
 				
-				defUsesWithFixedArrayDefUse = doCopyPropagation(defUsesWithFixedArrayDefUse);
-				defUsesWithFixedArrayDefUse = updateUseOrder(body, defUsesWithFixedArrayDefUse, nodeToIndex);
-				defUsesWithFixedArrayDefUse = removeUsesThatOccurAfterRedefinition(body, defUsesWithFixedArrayDefUse, 
+				defUses = doCopyPropagation(defUses);
+				defUses = updateUseOrder(body, defUses, nodeToIndex);
+				defUses = removeUsesThatOccurAfterRedefinition(body, defUses, 
 						nodeToIndex);
-				defUsesWithFixedArrayDefUse = adjustWeigthsOfDefUses(body, defUsesWithFixedArrayDefUse);
-				defUsesWithFixedArrayDefUse = assignLineNumbersToDefUses(body, defUsesWithFixedArrayDefUse);
+				defUses = adjustWeigthsOfDefUses(body, defUses);
+				defUses = assignLineNumbersToDefUses(body, defUses);
 				
-				Set<Loop> nonParallelLoops = getNonParallelizableLoops(body, defUsesWithFixedArrayDefUse);
-				defUsesWithFixedArrayDefUse = updateParallelizationAttribute(body, nonParallelLoops, 
-						defUsesWithFixedArrayDefUse);
+				Set<Loop> nonParallelLoops = getNonParallelizableLoops(body, defUses);
+				defUses = updateParallelizationAttribute(body, nonParallelLoops, 
+						defUses);
 				
-				methodDefUses.put(m, defUsesWithFixedArrayDefUse);
+				// Once we have done everything else, we get rid of def/uses corresponding to loops. 
+				// it is important that this is done last because previous steps may make use of those def/uses
+				defUses = removeDefUsesForLoopCountersVars((ShimpleBody)body, defUses);
+				
+				methodDefUses.put(m, defUses);
 				methodNonParallelLoops.put(m, nonParallelLoops);
 			}
 		} catch (Exception e) {
@@ -642,13 +647,21 @@ public class Analysis extends BodyTransformer {
 					}
 				}
 				prevUses.removeAll(toRemove);
-				
-				System.out.println("prevDefUse: " + prevDefUse);
-				System.out.println("currDefUses: " + currDefUse);
 			}
 		}
 		
 		// any changes would automatically have been reflected in original defUses
+		return defUses;
+	}
+	
+	protected static Map<Stmt, DefUse> removeDefUsesForLoopCountersVars(ShimpleBody body, Map<Stmt, DefUse> defUses)
+			throws UnsupportedFeatureException {
+		LoopHelper lh = new LoopHelper(body);
+		Set<Stmt> loopDefs = lh.getAllLoopCounterVariableDefStmts(defUses);
+		for(Stmt key: loopDefs) {
+			assert(defUses.containsKey(key));
+			defUses.remove(key);
+		}
 		return defUses;
 	}
 
