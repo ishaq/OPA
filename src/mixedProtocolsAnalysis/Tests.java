@@ -48,7 +48,7 @@ public class Tests extends TestCase {
 		args[i++] = "-O"; // Optmization causes Def/Uses to throw NullPointerException in case a PhiNode gets collapsed, therefore turning it off
 		// -cp specifies the class path. Must include a path to the application classes, and the rt.jar
 		args[i++] = "-cp";
-		args[i++] = "./src/programs/psi/:"+RT_HOME;
+		args[i++] = "./src/programs/biometric/:"+RT_HOME;
 		// specifies the class that contains the "main" method
 		args[i++] = "P";
  		Main.main(args);

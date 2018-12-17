@@ -168,7 +168,7 @@ public class Analysis extends BodyTransformer {
 				
 				// printBodyInfo(body);
 				
-				// TODO: scan body for call instructions, throw an exception if there is one
+				// TODO: scan body for call instructions, throw an exception if there is one (except the ones we allow e.g. MUX)
 				
 				Map<Stmt, DefUse> defUses = collectDefUses(body);
 				Map<Stmt, DefUse> arrayDefUses = collectArrayDefUses(body);
@@ -180,6 +180,8 @@ public class Analysis extends BodyTransformer {
 				
 				defUsesWithFixedArrayDefUse = doCopyPropagation(defUsesWithFixedArrayDefUse);
 				defUsesWithFixedArrayDefUse = updateUseOrder(body, defUsesWithFixedArrayDefUse, nodeToIndex);
+				defUsesWithFixedArrayDefUse = removeUsesThatOccurAfterRedefinition(body, defUsesWithFixedArrayDefUse, 
+						nodeToIndex);
 				defUsesWithFixedArrayDefUse = adjustWeigthsOfDefUses(body, defUsesWithFixedArrayDefUse);
 				defUsesWithFixedArrayDefUse = assignLineNumbersToDefUses(body, defUsesWithFixedArrayDefUse);
 				
@@ -365,6 +367,8 @@ public class Analysis extends BodyTransformer {
 			}
 		}
 		
+		// now order the uses
+		
 		return arrayDefUses;
 	}
 
@@ -444,6 +448,11 @@ public class Analysis extends BodyTransformer {
 				continue;
 			}
 			AssignStmt assignStmt = (AssignStmt) du.def.id;
+			
+			if((assignStmt.getLeftOp() instanceof Local) == false) {
+				continue;
+			}
+			
 			if ((assignStmt.getRightOp() instanceof Local) == false) {
 				continue;
 			}
@@ -573,6 +582,69 @@ public class Analysis extends BodyTransformer {
 			assert(usesThatHaveBeenAssignedOrder.equals(du.getUses()));
 		}
 		
+		return defUses;
+	}
+	
+	protected static Map<Stmt, DefUse> removeUsesThatOccurAfterRedefinition(Body body, Map<Stmt, DefUse> defUses,
+			Map<Unit, Integer> nodeToIndex) {
+		
+		Map<Local, List<DefUse>> varDefUseMap = new HashMap<Local, List<DefUse>>();
+		
+		// build the map
+		for(Stmt key: defUses.keySet()) {
+			DefUse du = defUses.get(key);
+			ArrayList<DefUse> existingList = (ArrayList<DefUse>) varDefUseMap.get(du.var);
+			if(existingList == null) {
+				existingList = new ArrayList<DefUse>();
+				varDefUseMap.put(du.var, existingList);
+			}
+			// insertion sort
+			int index = 0;
+			while(index < (existingList.size() - 1)) {
+				DefUse existingDefUse = existingList.get(index);
+				if(nodeToIndex.get(existingDefUse.def.id) > nodeToIndex.get(du.def.id)) {
+					// if the existing def occurs *after* the current def, break
+					break;
+				}
+				// otherwise increment index (the existing def index is less, we want to insert this one after it
+				index += 1;
+			}
+			existingList.add(index, du);
+		}
+		
+		// go through the map
+		for(Local key: varDefUseMap.keySet()) {
+			List<DefUse> defUseList = varDefUseMap.get(key);
+			if(defUseList.size() < 2) {
+				continue;
+			}
+			
+			// if multiple defs for same var
+			for(int i = 1; i < defUseList.size(); i++) {
+				// remove all uses of the later def (that occur after the later def).
+				DefUse prevDefUse = defUseList.get(i-1);
+				Set<Node> prevUses = prevDefUse.uses;
+				DefUse currDefUse = defUseList.get(i);
+				int currDefIndex = nodeToIndex.get(currDefUse.def.id);
+				Set<Stmt> currUsesIDs = new HashSet<Stmt>();
+				for(Node u: currDefUse.uses) {
+					currUsesIDs.add(u.id);
+				}
+				
+				Set<Node> toRemove = new HashSet<Node>();
+				for(Node u: prevUses) {
+					if(nodeToIndex.get(u.id) > currDefIndex && currUsesIDs.contains(u.id)) {
+						toRemove.add(u);
+					}
+				}
+				prevUses.removeAll(toRemove);
+				
+				System.out.println("prevDefUse: " + prevDefUse);
+				System.out.println("currDefUses: " + currDefUse);
+			}
+		}
+		
+		// any changes would automatically have been reflected in original defUses
 		return defUses;
 	}
 
