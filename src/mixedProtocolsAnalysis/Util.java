@@ -19,20 +19,184 @@ import soot.Local;
 import soot.Unit;
 import soot.UnitBox;
 import soot.Value;
+import soot.jimple.AddExpr;
 import soot.jimple.ArrayRef;
 import soot.jimple.AssignStmt;
 import soot.jimple.BinopExpr;
+import soot.jimple.DivExpr;
+import soot.jimple.DoubleConstant;
+import soot.jimple.EqExpr;
+import soot.jimple.FloatConstant;
+import soot.jimple.IntConstant;
 import soot.jimple.InvokeExpr;
+import soot.jimple.LongConstant;
+import soot.jimple.MulExpr;
+import soot.jimple.NeExpr;
 import soot.jimple.NegExpr;
+import soot.jimple.NewArrayExpr;
+import soot.jimple.NewMultiArrayExpr;
 import soot.jimple.NumericConstant;
+import soot.jimple.RemExpr;
 import soot.jimple.Stmt;
+import soot.jimple.SubExpr;
 import soot.jimple.UnopExpr;
 import soot.jimple.toolkits.annotation.logic.Loop;
+import soot.jimple.toolkits.scalar.Evaluator;
 import soot.shimple.PhiExpr;
+import soot.shimple.toolkits.scalar.ShimpleLocalDefs;
 import soot.toolkits.scalar.ValueUnitPair;
 
 
 public class Util {
+	public static int guessConcreteValue(Value symbolicValue, ShimpleLocalDefs localDefs) throws UnsupportedFeatureException, RuntimeException{
+		return guessConcreteValue(symbolicValue, new HashSet<Local>(), localDefs);
+	}
+	private static int guessConcreteValue(Value symbolicValue, Set<Local> seenLocals, ShimpleLocalDefs localDefs) throws UnsupportedFeatureException, RuntimeException {
+		if(Evaluator.isValueConstantValued(symbolicValue)) {
+			Value v = Evaluator.getConstantValueOf(symbolicValue);
+			if(v instanceof IntConstant) {
+				return ((IntConstant)v).value;
+			}
+			else if(v instanceof LongConstant) {
+				// TODO: this might truncate Long to an int
+				// TODO: configure a logger and log a warning here
+				return (int) ((LongConstant)v).value;
+			}
+			else if(v instanceof FloatConstant) {
+				return (int)((FloatConstant)v).value;
+			}
+			else if(v instanceof DoubleConstant) {
+				return (int)((DoubleConstant)v).value;
+			}
+		}
+		else if(symbolicValue instanceof Local) {
+			Local var = (Local)symbolicValue;
+			if(seenLocals.contains(var)) {
+				// a cycle, that means the first value of this variable comes from some other place
+				// hence, this variable can't affect the upper bound anyway
+				return Integer.MIN_VALUE;
+			}
+			seenLocals.add(var);
+			
+			Unit def = localDefs.getDefsOf(var).get(0);
+			if(!(def instanceof AssignStmt)) {
+				throw new UnsupportedFeatureException("definition statement can only be assign statement" +
+			"if all function calls were inlined. An identity statement shouldn't appear here: " + def);
+			}
+			AssignStmt assignment = (AssignStmt)def;
+			Value rightOp = assignment.getRightOp();
+			
+			if(rightOp instanceof UnopExpr) {
+				Value op = ((UnopExpr)rightOp).getOp();
+				int val = guessConcreteValue(op, seenLocals, localDefs);
+				if(rightOp instanceof NegExpr) {
+					return -val;
+				}
+				else {
+					throw new UnsupportedFeatureException("unrecoginized unary operator: " + rightOp);
+				}
+			}
+			else if(rightOp instanceof BinopExpr) {
+				BinopExpr op = (BinopExpr)rightOp;
+				Value op1 = op.getOp1();
+				Value op2 = op.getOp2();
+				int val1 = guessConcreteValue(op1, seenLocals, localDefs);
+				int val2 = guessConcreteValue(op2, seenLocals, localDefs);
+				if(val1 == Integer.MAX_VALUE || val2 == Integer.MAX_VALUE) { return Integer.MAX_VALUE; }
+				if(val1 == Integer.MIN_VALUE || val2 == Integer.MIN_VALUE) { return Integer.MIN_VALUE; }
+				if(op instanceof AddExpr) {
+					
+					return val1 + val2;
+				}
+				else if(op instanceof SubExpr) {
+					return val1 + val2;
+				}
+				else if(op instanceof MulExpr) {
+					return val1 * val2;
+				}
+				else if(op instanceof DivExpr) {
+					if(val2 == 0) {
+						throw new RuntimeException("Possible division by 0: " + op);
+					}
+					return val1 / val2;
+				}
+				else if(op instanceof RemExpr) {
+					return val1 % val2;
+				}
+				else if(op instanceof EqExpr) {
+					return val1 == val2 ? 1 : 0;
+				}
+				else if(op instanceof NeExpr) {
+					return val1 != val2 ? 1 : 0;
+				}
+				throw new UnsupportedFeatureException("Unsupported Binary Operation: " + op);
+			}
+			else if(rightOp instanceof PhiExpr) {
+				
+				PhiExpr phi = (PhiExpr)rightOp;
+				if(phi.getArgCount() != 2) {
+					throw new UnsupportedFeatureException("PhiExpr has " + phi.getArgCount() + " arguments");
+				}
+				
+				List<ValueUnitPair> args =  phi.getArgs();
+				Value arg1 = args.get(0).getValue();
+				Value arg2 = args.get(1).getValue();
+				int val1 = guessConcreteValue(arg1, seenLocals, localDefs);
+				int val2 = guessConcreteValue(arg2, seenLocals, localDefs);
+				if(val1 > val2) {
+					return val1;
+				}
+				return val2;
+			}
+			else {
+				// may be right op is a constant, or a local, so we make recursive call
+				return guessConcreteValue(rightOp, seenLocals, localDefs);
+			}
+			
+		}
+		throw new UnsupportedFeatureException("Couldn't guess concrete value for: " + symbolicValue);
+//		System.out.println("WARNING!!! Couldn't guess number of iterations for " + upperBound + ", you might want to check the loop");
+//		return DEFAULT_LOOP_ITERATIONS;	
+	}
+	
+	public static ArrayList<Integer> getArraySizes(Unit s, ShimpleLocalDefs localDefs) throws UnsupportedFeatureException, RuntimeException {
+		if(((AssignStmt)s).getRightOp() instanceof NewArrayExpr) {
+			NewArrayExpr newArrayExpr = (NewArrayExpr)((AssignStmt)s).getRightOp();
+			Value sizeVal = newArrayExpr.getSize();
+			int sizeInt = guessConcreteValue(sizeVal, localDefs);
+			ArrayList<Integer> sizes = new ArrayList<Integer>(1);
+			sizes.add(sizeInt);
+			return sizes;
+		}
+		else if(((AssignStmt)s).getRightOp() instanceof NewMultiArrayExpr) {
+			NewMultiArrayExpr newArrayExpr = (NewMultiArrayExpr)((AssignStmt)s).getRightOp();
+			List<Value> sizeVals = newArrayExpr.getSizes();
+			ArrayList<Integer> sizeInts = new ArrayList<Integer>(sizeVals.size());
+			for(int i = 0; i < sizeVals.size(); i++) {
+				sizeInts.add(guessConcreteValue(sizeVals.get(i), localDefs));
+			}
+			return sizeInts;
+		}
+		else if(((AssignStmt)s).getRightOp() instanceof ArrayRef) {
+			ArrayRef arrayRef = (ArrayRef)((AssignStmt)s).getRightOp();
+			Local l = (Local) arrayRef.getBase();
+			Unit def = localDefs.getDefsOf(l).get(0);
+			ArrayList sizes = getArraySizes(def, localDefs);
+			// since this array is skipping one dimension, we should also skip one dimension
+			sizes.remove(0);
+			return sizes;
+		}
+		else if(((AssignStmt)s).getLeftOp() instanceof ArrayRef) {
+			// re-defn of an array, array dimension doesn't change
+			ArrayRef arrayRef = (ArrayRef)((AssignStmt)s).getLeftOp();
+			Local l = (Local) arrayRef.getBase();
+			Unit def = localDefs.getDefsOf(l).get(0);
+			ArrayList sizes = getArraySizes(def, localDefs);
+			return sizes;
+		}
+		
+		throw new UnsupportedFeatureException("Unknown array init statement: " + s);
+	}
 	public static boolean isArrayDefStatement(Stmt stmt) {
 		if((stmt instanceof AssignStmt) == false) {
 			return false;

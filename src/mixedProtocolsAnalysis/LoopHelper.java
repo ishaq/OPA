@@ -4,44 +4,24 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 
 import soot.Body;
 import soot.Local;
-import soot.Unit;
 import soot.Value;
-import soot.jimple.AddExpr;
-import soot.jimple.AssignStmt;
-import soot.jimple.BinopExpr;
 import soot.jimple.ConditionExpr;
-import soot.jimple.DivExpr;
-import soot.jimple.DoubleConstant;
-import soot.jimple.EqExpr;
-import soot.jimple.FloatConstant;
 import soot.jimple.GeExpr;
 import soot.jimple.GtExpr;
 import soot.jimple.IfStmt;
-import soot.jimple.IntConstant;
 import soot.jimple.LeExpr;
-import soot.jimple.LongConstant;
 import soot.jimple.LtExpr;
-import soot.jimple.MulExpr;
-import soot.jimple.NeExpr;
-import soot.jimple.NegExpr;
-import soot.jimple.RemExpr;
 import soot.jimple.Stmt;
-import soot.jimple.SubExpr;
-import soot.jimple.UnopExpr;
 import soot.jimple.toolkits.annotation.logic.Loop;
-import soot.jimple.toolkits.scalar.Evaluator;
-import soot.shimple.PhiExpr;
 import soot.shimple.ShimpleBody;
 import soot.shimple.toolkits.scalar.ShimpleLocalDefs;
 import soot.toolkits.graph.LoopNestTree;
-import soot.toolkits.scalar.ValueUnitPair;
 
 public class LoopHelper {
 	protected static int DEFAULT_LOOP_ITERATIONS = Integer.MAX_VALUE;
@@ -292,116 +272,10 @@ public class LoopHelper {
 	}
 	
 	private int guessLoopUpperBoundValue(Value upperBound) throws UnsupportedFeatureException, RuntimeException {
-		return guessLoopUpperBoundValue(upperBound, new HashSet<Local>());
+		return Util.guessConcreteValue(upperBound, this.localDefs);
 	}
 	
-	private int guessLoopUpperBoundValue(Value upperBound, Set<Local> seenLocals) throws UnsupportedFeatureException, RuntimeException {
-		if(Evaluator.isValueConstantValued(upperBound)) {
-			Value v = Evaluator.getConstantValueOf(upperBound);
-			if(v instanceof IntConstant) {
-				return ((IntConstant)v).value;
-			}
-			else if(v instanceof LongConstant) {
-				// TODO: this might truncate Long to an int
-				// TODO: configure a logger and log a warning here
-				return (int) ((LongConstant)v).value;
-			}
-			else if(v instanceof FloatConstant) {
-				return (int)((FloatConstant)v).value;
-			}
-			else if(v instanceof DoubleConstant) {
-				return (int)((DoubleConstant)v).value;
-			}
-		}
-		else if(upperBound instanceof Local) {
-			Local var = (Local)upperBound;
-			if(seenLocals.contains(var)) {
-				// a cycle, that means the first value of this variable comes from some other place
-				// hence, this variable can't affect the upper bound anyway
-				return Integer.MIN_VALUE;
-			}
-			seenLocals.add(var);
-			
-			Unit def = this.localDefs.getDefsOf(var).get(0);
-			if(!(def instanceof AssignStmt)) {
-				throw new UnsupportedFeatureException("definition statement can only be assign statement" +
-			"if all function calls were inlined. An identity statement shouldn't appear here: " + def);
-			}
-			AssignStmt assignment = (AssignStmt)def;
-			Value rightOp = assignment.getRightOp();
-			
-			if(rightOp instanceof UnopExpr) {
-				Value op = ((UnopExpr)rightOp).getOp();
-				int val = guessLoopUpperBoundValue(op, seenLocals);
-				if(rightOp instanceof NegExpr) {
-					return -val;
-				}
-				else {
-					throw new UnsupportedFeatureException("unrecoginized unary operator: " + rightOp);
-				}
-			}
-			else if(rightOp instanceof BinopExpr) {
-				BinopExpr op = (BinopExpr)rightOp;
-				Value op1 = op.getOp1();
-				Value op2 = op.getOp2();
-				int val1 = guessLoopUpperBoundValue(op1, seenLocals);
-				int val2 = guessLoopUpperBoundValue(op2, seenLocals);
-				if(val1 == Integer.MAX_VALUE || val2 == Integer.MAX_VALUE) { return Integer.MAX_VALUE; }
-				if(val1 == Integer.MIN_VALUE || val2 == Integer.MIN_VALUE) { return Integer.MIN_VALUE; }
-				if(op instanceof AddExpr) {
-					
-					return val1 + val2;
-				}
-				else if(op instanceof SubExpr) {
-					return val1 + val2;
-				}
-				else if(op instanceof MulExpr) {
-					return val1 * val2;
-				}
-				else if(op instanceof DivExpr) {
-					if(val2 == 0) {
-						throw new RuntimeException("Possible division by 0: " + op);
-					}
-					return val1 / val2;
-				}
-				else if(op instanceof RemExpr) {
-					return val1 % val2;
-				}
-				else if(op instanceof EqExpr) {
-					return val1 == val2 ? 1 : 0;
-				}
-				else if(op instanceof NeExpr) {
-					return val1 != val2 ? 1 : 0;
-				}
-				throw new UnsupportedFeatureException("Unsupported Binary Operation: " + op);
-			}
-			else if(rightOp instanceof PhiExpr) {
-				
-				PhiExpr phi = (PhiExpr)rightOp;
-				if(phi.getArgCount() != 2) {
-					throw new UnsupportedFeatureException("PhiExpr has " + phi.getArgCount() + " arguments");
-				}
-				
-				List<ValueUnitPair> args =  phi.getArgs();
-				Value arg1 = args.get(0).getValue();
-				Value arg2 = args.get(1).getValue();
-				int val1 = guessLoopUpperBoundValue(arg1, seenLocals);
-				int val2 = guessLoopUpperBoundValue(arg2, seenLocals);
-				if(val1 > val2) {
-					return val1;
-				}
-				return val2;
-			}
-			else {
-				// may be right op is a constant, or a local, so we make recursive call
-				return guessLoopUpperBoundValue(rightOp, seenLocals);
-			}
-			
-		}
-		throw new UnsupportedFeatureException("Couldn't guess number of iterations for " + upperBound + ", you might want to check the loop");
-//		System.out.println("WARNING!!! Couldn't guess number of iterations for " + upperBound + ", you might want to check the loop");
-//		return DEFAULT_LOOP_ITERATIONS;	
-	}
+	
 	
 	private static int multiplyLoopIterations(int l1, int l2) {
 		if(l1 == Integer.MAX_VALUE || l2 == Integer.MAX_VALUE) {

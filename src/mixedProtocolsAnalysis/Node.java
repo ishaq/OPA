@@ -1,5 +1,7 @@
 package mixedProtocolsAnalysis;
 
+import java.util.ArrayList;
+
 import soot.Local;
 import soot.jimple.AbstractStmtSwitch;
 import soot.jimple.AddExpr;
@@ -488,6 +490,11 @@ public class Node {
 	 * and iterations of that loop are independent of each other
 	 */
 	protected boolean parallelizable = false;
+	
+	/**
+	 * contains the array dimensions, this is only applicable if this node represents definition of an array
+	 */
+	protected ArrayList<Integer> arrayDimensions = null;
 
 	public Node(Stmt stmt) {
 		this.id = stmt;
@@ -544,10 +551,22 @@ public class Node {
 		this.parallelizable = parallelizable;
 	}
 
+	public int getArrayWeight() {
+		if(arrayDimensions == null) {
+			return 1;
+		}
+		int w = 1;
+		for(int d: arrayDimensions) {
+			w = w * d;
+		}
+		return w;
+	}
+	
 	public String toString() {
-		return "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + 
-				", order: " + useOrder + ", weight = " + weight
+		String repr = "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + 
+				", order: " + useOrder + ", weight = " + weight + ", arrayWeight: " + getArrayWeight()
 				+ ", conversionWeight = " + conversionWeight + ")";
+		return repr;
 
 	}
 }

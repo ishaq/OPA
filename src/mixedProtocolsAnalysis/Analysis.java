@@ -6,8 +6,6 @@ import java.io.Writer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -16,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.Stack;
 
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
@@ -313,10 +310,13 @@ public class Analysis extends BodyTransformer {
 		return defUses;
 	}
 
-	protected static Map<Stmt, DefUse> collectArrayDefUses(Body body) throws IllegalArgumentException {
+	protected static Map<Stmt, DefUse> collectArrayDefUses(Body body) 
+			throws UnsupportedFeatureException, IllegalArgumentException {
 		if ((body instanceof ShimpleBody) == false) {
 			throw new IllegalArgumentException("Not a shimple body");
 		}
+		
+		ShimpleLocalDefs localDefs = new ShimpleLocalDefs((ShimpleBody) body);
 
 		Map<Stmt, DefUse> arrayDefUses = new HashMap<Stmt, DefUse>();
 		BriefUnitGraph cfg = new BriefUnitGraph(body);
@@ -332,6 +332,8 @@ public class Analysis extends BodyTransformer {
 				}
 				
 				DefUse thisDefUse = new DefUse(l, s);
+				thisDefUse.def.arrayDimensions = Util.getArraySizes(u, localDefs);
+				
 				arrayDefUses.put(thisDefUse.def.id, thisDefUse);
 				Set<Local> localsToMatch = new HashSet<Local>();
 				localsToMatch.add(thisDefUse.var);
