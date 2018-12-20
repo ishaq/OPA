@@ -1,19 +1,32 @@
-interface Multiplex {
+interface MPCAnnotation {
+	// represents a MUX node
 	public int MUX(int a, int b, boolean cond);
+	// is used to mark input variables
+	public void IN(int x);
+	// is used to mark output variables
+	public void OUT(int x);
 }
 
-class MultiplexImpl implements Multiplex {
-	public static Multiplex v = null;
-	private MultiplexImpl() {
-		
+class MPCAnnotationImpl implements MPCAnnotation {
+	private static MPCAnnotation v = null;
+
+	private MPCAnnotationImpl() {
+
 	}
+
 	public int MUX(int a, int b, boolean cond) {
 		return (cond ? a : b);
 	}
 	
-	public static Multiplex v() {
-		if(v == null) {
-			v = new MultiplexImpl();
+	public void IN(int x) {
+	}
+	
+	public void OUT(int x) {
+	}
+
+	public static MPCAnnotation v() {
+		if (v == null) {
+			v = new MPCAnnotationImpl();
 		}
 		return v;
 	}
@@ -26,7 +39,7 @@ public class P {
 //		int rem = 0;
 //		for (int j = len-1; j >= 0; j--) {
 //			rem = rem << 1;
-//			// rem[0] = x[j] // note that we use >>> for unsigned shift
+//			// rem[0] = x[j] // note that we use >>> for unsigned shift right
 //			 rem = rem + ((x >>> j) & 1);
 //			
 //			if (rem >= y) {
@@ -37,8 +50,12 @@ public class P {
 //	}
 	
     public static void main(String[] args) {
+    	MPCAnnotation mpc = MPCAnnotationImpl.v();
     	int a = 100;
     	int b = 60;
+    	mpc.IN(a);
+    	mpc.IN(b);
+    	
     	int rem;
     	for(int i = 0; i < len; i++) {
 //    		if (b != 0) {
@@ -52,5 +69,7 @@ public class P {
     		b = MultiplexImpl.v.MUX(rem, b, neq);
     		a = MultiplexImpl.v.MUX(temp,  a, neq);
     	}
+    	
+    	mpc.OUT(rem);
     }
 }

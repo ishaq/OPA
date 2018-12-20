@@ -208,6 +208,7 @@ public class Analysis extends BodyTransformer {
 				// Once we have done everything else, we get rid of def/uses corresponding to loops. 
 				// it is important that this is done last because previous steps may make use of those def/uses
 				defUses = removeDefUsesForLoopCountersVars((ShimpleBody)body, defUses);
+				defUses = finalizeOutput(defUses);
 				
 				methodDefUses.put(m, defUses);
 				methodNonParallelLoops.put(m, nonParallelLoops);
@@ -681,6 +682,30 @@ public class Analysis extends BodyTransformer {
 		for(Stmt key: loopDefs) {
 			assert(defUses.containsKey(key));
 			defUses.remove(key);
+		}
+		return defUses;
+	}
+	
+	protected static Map<Stmt, DefUse> finalizeOutput(Map<Stmt, DefUse> defUses) {
+		Set<Stmt> toRemove = new HashSet<Stmt>();
+		for(Stmt key: defUses.keySet()) {
+			DefUse du = defUses.get(key);
+			if(du.uses.size() == 0) { // no need to include defs that have no uses
+				toRemove.add(key);
+			}
+			else if(du.uses.size() == 1) { // if def and use are the same instruction, it is dead code
+				// technically such def/use should not exist to begin with, I don't know whether it's a bug in Soot
+				// or Soot needs to do multiple passes (and we are only doing one) to get rid of such artifacts
+				Node use = du.uses.iterator().next();
+				if(du.def.id.equals(use.id)) {
+					toRemove.add(key);
+				}
+			}
+		}
+		for(Stmt item: toRemove) {
+			DefUse du = defUses.get(item);
+			System.out.println("Removing defuse: " + du);
+			defUses.remove(item);
 		}
 		return defUses;
 	}
