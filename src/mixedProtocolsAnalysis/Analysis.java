@@ -78,14 +78,18 @@ public class Analysis extends BodyTransformer {
 			};
 			obj.add("id", ctx.serialize(src.getId(), stmtType.getType()));
 			obj.addProperty("weight", src.getWeight());
-			obj.addProperty("arrayWeight", src.getArrayWeight());
+			obj.addProperty("array_weight", src.getArrayWeight());
 			obj.addProperty("line_number", src.getLineNumber());
 			TypeToken<Node.NodeType> nodeTypeType = new TypeToken<Node.NodeType>() {
 			};
 			obj.add("node_type", ctx.serialize(src.getNodeType(), nodeTypeType.getType()));
-			obj.addProperty("conversion_weight", src.getConversionWeight());
-			obj.add("conversion_point", ctx.serialize(src.getConversionPoint(), stmtType.getType()));
-			obj.addProperty("parallelizable", src.isParallelizable());
+			
+			if(src.getConversionPoint() != null) {
+				obj.add("conversion_point", ctx.serialize(src.getConversionPoint(), stmtType.getType()));
+				obj.addProperty("conversion_weight", src.conversionWeight);
+				obj.addProperty("conversion_parallel_param", src.conversionParallelParam);
+			}
+			obj.addProperty("parallel_param", src.getParallelParam());
 			obj.addProperty("order", src.getUseOrder());
 			return obj;
 		}
@@ -132,6 +136,19 @@ public class Analysis extends BodyTransformer {
 		}
 	}
 	
+	private class LoopInfoSerializer implements JsonSerializer<LoopInfo> {
+		public JsonElement serialize(LoopInfo src, Type typeOfSrc, JsonSerializationContext ctx) {
+			JsonObject obj = new JsonObject();
+			TypeToken<Loop> loopType = new TypeToken<Loop>() {
+			};
+			obj.add("loop", ctx.serialize(src.loop, loopType.getType()));
+			obj.addProperty("parallel_param", src.parallelParam);
+			obj.addProperty("weight", src.weight);
+			obj.addProperty("iterations_count", src.iterationsCount);
+			return obj;
+		}
+	}
+	
 	public class UseComparator implements Comparator<Node> {
 		@Override
 		public int compare(Node o1, Node o2) {
@@ -141,8 +158,10 @@ public class Analysis extends BodyTransformer {
 
 	static final String ANALYSIS_JSON_FILENAME = "analysis.json";
 
-	protected Map<SootMethod, Map<Stmt, DefUse>> methodDefUses = new HashMap<SootMethod, Map<Stmt, DefUse>>();
-	protected Map<SootMethod, Set<Loop>> methodNonParallelLoops = new HashMap<SootMethod, Set<Loop>>();
+	protected Map<SootMethod, Map<Stmt, DefUse>> methodDefUses = 
+			new HashMap<SootMethod, Map<Stmt, DefUse>>();
+	protected Map<SootMethod, Map<Loop, LoopInfo>> methodLoopInfo = 
+			new HashMap<SootMethod, Map<Loop, LoopInfo>>();
 
 	private Map<Unit, Integer> nodeToIndex = null;
 	private ArrayList<Unit> nodes;
@@ -198,11 +217,11 @@ public class Analysis extends BodyTransformer {
 				defUses = updateUseOrder(body, defUses, nodeToIndex);
 				defUses = removeUsesThatOccurAfterRedefinition(body, defUses, 
 						nodeToIndex);
-				defUses = adjustWeigthsOfDefUses(body, defUses);
+				defUses = setDefUseConversionPoints(body, defUses);
 				defUses = assignLineNumbersToDefUses(body, defUses);
 				
-				Set<Loop> nonParallelLoops = getNonParallelizableLoops(body, defUses);
-				defUses = updateParallelizationAttribute(body, nonParallelLoops, 
+				Map<Loop, LoopInfo> loopInfo = gatherLoopParallelizationInfo(body, defUses);
+				defUses = updateWeightAndParallelParam(body, loopInfo, 
 						defUses);
 				
 				// Once we have done everything else, we get rid of def/uses corresponding to loops. 
@@ -211,7 +230,7 @@ public class Analysis extends BodyTransformer {
 				defUses = finalizeOutput(defUses);
 				
 				methodDefUses.put(m, defUses);
-				methodNonParallelLoops.put(m, nonParallelLoops);
+				methodLoopInfo.put(m, loopInfo);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -246,18 +265,19 @@ public class Analysis extends BodyTransformer {
 			gsonBuilder.registerTypeAdapter(Node.class, new NodeSerializer());
 			gsonBuilder.registerTypeAdapter(DefUse.class, new DefUseSerializer());
 			gsonBuilder.registerTypeAdapter(Loop.class, new LoopSerializer());
+			gsonBuilder.registerTypeAdapter(LoopInfo.class, new LoopInfoSerializer());
 			// TODO: pretty printing can be turned off
 			gsonBuilder.setPrettyPrinting();
 			
 			Gson gson = gsonBuilder.create();
 			SootMethod defUseKey = methodDefUses.keySet().iterator().next();
 			Map<Stmt, DefUse> defUses = methodDefUses.get(defUseKey);
-			SootMethod nonParallelLoopKey = methodNonParallelLoops.keySet().iterator().next();
-			Set<Loop> nonParallelLoops = methodNonParallelLoops.get(nonParallelLoopKey);
+			SootMethod loopInfoKey = methodLoopInfo.keySet().iterator().next();
+			Map<Loop, LoopInfo> loopInfo = methodLoopInfo.get(loopInfoKey);
 			
 			Map<String, Object> analysis = new HashMap<String, Object>();
 			analysis.put("def_use", defUses);
-			analysis.put("nonparallel_loops", nonParallelLoops);
+			analysis.put("loop_info", loopInfo);
 			gson.toJson(analysis, writer);
 			//gson.toJson(defUses, writer);
 			System.out.println("Def/Use analysis written to: " + (new java.io.File(".")).getCanonicalPath() + "/" + ANALYSIS_JSON_FILENAME);
@@ -397,16 +417,17 @@ public class Analysis extends BodyTransformer {
 		
 		return arrayDefUses;
 	}
-
-	protected static Map<Stmt, DefUse> adjustWeigthsOfDefUses(Body body, Map<Stmt, DefUse> defUses) throws Exception {
+	
+	protected static Map<Stmt, DefUse> setDefUseConversionPoints(Body body, Map<Stmt, DefUse> defUses) throws Exception {
 		LoopHelper loopHelper = new LoopHelper(body);
 		for (Stmt stmt : defUses.keySet()) {
 			DefUse thisDefUse = defUses.get(stmt);
 			for (Node use : thisDefUse.getUses()) {
-				loopHelper.setDefUseWeights(thisDefUse.def, use);
+				loopHelper.setConversionPoint(thisDefUse.def, use);
 			}
 		}
 
+		// TODO: need to find better home for this chunk of code
 		Set<IfStmt> loopIfs = loopHelper.getIfStmtsOwnedByLoops();
 		for (Stmt stmt : defUses.keySet()) {
 			DefUse thisDefUse = defUses.get(stmt);
@@ -506,7 +527,27 @@ public class Analysis extends BodyTransformer {
 		return defUses;
 	}
 	
-	protected static Set<Loop> getNonParallelizableLoops(Body body, Map<Stmt, DefUse> defUses) 
+	public static class LoopInfo {
+		// primary attrs 
+		public Loop loop;
+		public int iterationsCount = 1;
+		public boolean isParallel = false;
+		
+		// derived attrs
+		public int parallelParam = 1;
+		public int weight = 1;
+		
+		public LoopInfo(Loop loop, int iterationsCount, boolean isParallel) {
+			this.loop = loop;
+			this.iterationsCount = iterationsCount;
+			this.isParallel = isParallel;
+			
+			weight = iterationsCount;
+			parallelParam = (isParallel) ? iterationsCount:1;
+		}
+	}
+	
+	protected static Map<Loop, LoopInfo> gatherLoopParallelizationInfo(Body body, Map<Stmt, DefUse> defUses) 
 			throws UnsupportedFeatureException {
 		Set<Loop> nonParallelLoops = new HashSet<Loop>();
 		LoopHelper loopHelper = new LoopHelper(body);
@@ -526,7 +567,6 @@ public class Analysis extends BodyTransformer {
 					continue;
 				}
 				DefUse du = defUses.get(key);
-				// TODO: new logic for ignored variables
 				if(varsToIgnore.contains(du.var)) {
 					continue;
 				}
@@ -541,10 +581,30 @@ public class Analysis extends BodyTransformer {
 			prevLoops.add(l);
 		}
 		
-		return nonParallelLoops;
+		Map<Loop, LoopInfo> loopInfo = new HashMap<Loop, LoopInfo>();
+		for(Loop l: loopHelper.getLoopsTree()) {
+			int iterationsCount = loopHelper.guessLoopIterations(l);
+			boolean isParallel = !(nonParallelLoops.contains(l));
+			loopInfo.put(l, new LoopInfo(l, iterationsCount, isParallel));
+		}
+		
+		for(Loop l: loopHelper.getLoopsTree()) {
+			LoopInfo li = loopInfo.get(l);
+			Loop parentLoop = loopHelper.getImmediateParentLoop(l);
+			while(parentLoop != null) {
+				LoopInfo pli = loopInfo.get(parentLoop);
+				li.weight = li.weight * pli.iterationsCount;
+				if(pli.isParallel) {
+					li.parallelParam = li.parallelParam * pli.iterationsCount;
+				}
+				
+				parentLoop = loopHelper.getImmediateParentLoop(parentLoop);
+			}
+		}
+		return loopInfo;
 	}
 	
-	protected static Map<Stmt, DefUse> updateParallelizationAttribute(Body body, Set<Loop> nonParallelLoops, 
+	protected static Map<Stmt, DefUse> updateWeightAndParallelParam(Body body, Map<Loop, LoopInfo> loopInfo, 
 			Map<Stmt, DefUse> defUses) throws UnsupportedFeatureException {
 		LoopHelper loopHelper = new LoopHelper(body);
 		Set<Stmt> allKeys = defUses.keySet();
@@ -552,22 +612,44 @@ public class Analysis extends BodyTransformer {
 			DefUse du = defUses.get(key);
 			Loop defLoop = loopHelper.getImmediateParentLoop(du.def.id);
 			if(defLoop != null) {
-				du.def.setParallelizable(!nonParallelLoops.contains(defLoop));
+				LoopInfo li = loopInfo.get(defLoop);
+				du.def.setParallelParam(li.parallelParam);
+				du.def.setWeight(li.weight);
 			}
 			else {
-				// outside of any loop, therefore, no parallelizable
-				du.def.setParallelizable(false);
+				// TODO:
+				// outside of any loop. Currently we consider this non parallelizable. This is not strictly true,
+				// since multiple nodes on the same depth should ideally still run in parallel. But analyzing that is part
+				// of future work (when we implement this stuff against something better e.g. CBMC-GC)
+				du.def.setParallelParam(1);
+				du.def.setWeight(1);
 			}
 			
 			for(Node use: du.uses) {
 				Loop useLoop = loopHelper.getImmediateParentLoop(use.id);
 				if(useLoop != null) {
-					use.setParallelizable(!nonParallelLoops.contains(useLoop));
+					LoopInfo li = loopInfo.get(useLoop);
+					use.setParallelParam(li.parallelParam);
+					use.setWeight(li.weight);
 				}
 				else {
-					use.setParallelizable(false);
+					use.setParallelParam(1);
+					use.setWeight(1);
+				}
+				
+				// TODO: this is redundant, but currently we need to keep it here because we don't export all nodes
+				Loop conversionLoop = loopHelper.getImmediateParentLoop(use.conversionPoint);
+				if(conversionLoop != null) {
+					LoopInfo li = loopInfo.get(conversionLoop);
+					use.conversionParallelParam = li.parallelParam;
+					use.conversionWeight = li.weight;
+				}
+				else {
+					use.conversionParallelParam = 1;
+					use.conversionWeight = 1;
 				}
 			}
+			
 		}
 		return defUses;
 	}

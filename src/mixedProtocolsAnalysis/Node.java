@@ -461,14 +461,7 @@ public class Node {
 	/**
 	 * weight of this node
 	 */
-	protected int weight = -1;
-
-	/**
-	 * represents cost of def-use edge. the field is only defined for "use"
-	 * nodes. (since the edges exist only from def to use nodes). if this object
-	 * represents a "def" node, this field is invalid
-	 */
-	protected int conversionWeight = -1;
+	protected int weight = 1;
 	
 	/**
 	 * represents rank of a use (if this node is a "use" node.).
@@ -483,13 +476,19 @@ public class Node {
 	 * be placed. this field is only defined if this object represents a "use",
 	 * it is null for a "def"
 	 */
-	protected Stmt conversionPoint;
+	protected Stmt conversionPoint = null;
+	
+	// TODO: currently we keep both these variables here for convenience, 
+	// but once we start exporting all nodes (currently we only export def/uses that we need, not all of them),
+	// we should get rid of these
+	protected int conversionWeight = 1;
+	protected int conversionParallelParam = 1;
 	
 	/**
-	 * is this node parallelizable. A node is parallelizable if it is inside a loop 
-	 * and iterations of that loop are independent of each other
+	 * parallelization parameter, this is less than or equal to weight and indicates
+	 * how many executions (of weight) may be in parallel.
 	 */
-	protected boolean parallelizable = false;
+	protected int parallelParam = 1;
 	
 	/**
 	 * contains the array dimensions, this is only applicable if this node represents definition of an array
@@ -523,10 +522,6 @@ public class Node {
 		return weight;
 	}
 
-	public int getConversionWeight() {
-		return conversionWeight;
-	}
-
 	public Stmt getConversionPoint() {
 		return conversionPoint;
 	}
@@ -543,12 +538,12 @@ public class Node {
 		this.conversionPoint = conversionPoint;
 	}
 	
-	public boolean isParallelizable() {
-		return parallelizable;
+	public int getParallelParam() {
+		return parallelParam;
 	}
 	
-	public void setParallelizable(boolean parallelizable) {
-		this.parallelizable = parallelizable;
+	public void setParallelParam(int parallelParam) {
+		this.parallelParam = parallelParam;
 	}
 
 	public int getArrayWeight() {
@@ -565,7 +560,7 @@ public class Node {
 	public String toString() {
 		String repr = "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + 
 				", order: " + useOrder + ", weight = " + weight + ", arrayWeight: " + getArrayWeight()
-				+ ", conversionWeight = " + conversionWeight + ")";
+				+ ")";
 		return repr;
 
 	}

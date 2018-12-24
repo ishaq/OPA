@@ -99,12 +99,12 @@ public class LoopHelper {
 		return null;
 	}
 	
-	public void setDefUseWeights(Node def, Node use) throws UnsupportedFeatureException, RuntimeException {
+	public void setConversionPoint(Node def, Node use) throws UnsupportedFeatureException, RuntimeException {
 		Loop defLoop = getImmediateParentLoop(def.id);
-		def.weight = guessLoopIterationsIncludingParentLoops(defLoop);
+		//def.weight = guessLoopIterationsIncludingParentLoops(defLoop);
 		
 		Loop useLoop = getImmediateParentLoop(use.id);
-		use.weight = guessLoopIterationsIncludingParentLoops(useLoop);
+		//use.weight = guessLoopIterationsIncludingParentLoops(useLoop);
 		
 		Loop ancestor = getCommonAncestor(defLoop, useLoop);
 		Loop secondOldestAncestorOfUse = getSecondOldestAncestor(use.id, ancestor);
@@ -115,7 +115,7 @@ public class LoopHelper {
 			use.setConversionPoint(secondOldestAncestorOfUse.getHead());
 		}
 		
-		use.conversionWeight = guessLoopIterationsIncludingParentLoops(ancestor);				
+		//use.conversionWeight = guessLoopIterationsIncludingParentLoops(ancestor);				
 	}
 	
 	public Set<IfStmt> getIfStmtsOwnedByLoops() {
@@ -130,6 +130,26 @@ public class LoopHelper {
 			}
 		}
 		return null;
+	}
+	
+	public Loop getImmediateParentLoop(Loop l) {
+		Loop currentLoop = l;
+		while(true) {
+			SortedSet<Loop> tailSet = loopsTree.tailSet(currentLoop, false);
+			if(!(tailSet.size() > 0)) {
+				return null;
+			}
+			
+			Collection<Stmt> childLoopStatements = currentLoop.getLoopStatements();
+			// get potential parent
+			Loop potentialParent = tailSet.first();
+			Collection<Stmt> parentLoopStatements = potentialParent.getLoopStatements();
+			if(parentLoopStatements.containsAll(childLoopStatements)) {
+				return potentialParent;
+			}
+			// else
+			currentLoop = potentialParent;
+		}
 	}
 	
 	public Loop getCommonAncestor(Stmt s1, Stmt s2) {
@@ -228,16 +248,7 @@ public class LoopHelper {
 			int x = guessLoopIterations(l);
 			guessedIterations = multiplyLoopIterations(guessedIterations, x);
 			
-			if(!(loopsTree.tailSet(l, false).size() > 0)) {
-				break;
-			}
-			Collection<Stmt> childLoopStatements = l.getLoopStatements();
-			// get parent
-			l = loopsTree.tailSet(l, false).first();
-			Collection<Stmt> parentLoopStatements = l.getLoopStatements();
-			if(!parentLoopStatements.containsAll(childLoopStatements)) {
-				break;
-			}
+			l = getImmediateParentLoop(l);
 		}
 		
 		return guessedIterations;
@@ -254,7 +265,7 @@ public class LoopHelper {
 	 * @return guessed iterations of the loop
 	 * @throws UnsupportedFeatureException, RuntimeException
 	 */
-	private int guessLoopIterations(Loop l) throws UnsupportedFeatureException, RuntimeException {
+	public int guessLoopIterations(Loop l) throws UnsupportedFeatureException, RuntimeException {
 		int guessedIterationsCount = DEFAULT_LOOP_ITERATIONS;
 		
 		//System.out.println("Head: " + l.getHead());
@@ -289,6 +300,11 @@ public class LoopHelper {
 				}
 			}
 		}
+		
+		if(guessedIterationsCount == DEFAULT_LOOP_ITERATIONS) {
+			throw new UnsupportedFeatureException("loop count either too large or can't be guessed");
+		}
+		
 		return guessedIterationsCount;
 	}
 	
