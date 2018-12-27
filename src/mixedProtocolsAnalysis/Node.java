@@ -319,9 +319,7 @@ public class Node {
 				nodeType = NodeType.MUX;
 				return;
 			}
-			else if(v.getMethod().getSignature().equals("<MPCAnnotation: void IN(int)>") 
-					|| v.getMethod().getSignature().equals("<MPCAnnotation: int FIX_NOT_INITIALIZED_ERROR()>") 
-					) {
+			else if(v.getMethod().getSignature().equals("<MPCAnnotation: int IN()>")) {
 				nodeType = NodeType.IN;
 				return;
 			}
@@ -337,7 +335,7 @@ public class Node {
 		}
 
 		public void caseStaticInvokeExpr(StaticInvokeExpr v) {
-			// FIXME: these checks should be improved, intead of comparing to hard-coded signature,
+			// FIXME: these checks should be improved, instead of comparing to hard-coded signature,
 			// these should do something smarter.
 			if(v.getMethodRef().getSignature().equals("<MPCAnnotationImpl: MPCAnnotation v()>")) {
 				nodeType = NodeType.MPC_ANNOTATION_INSTANTIATION;

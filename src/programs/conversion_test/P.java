@@ -2,14 +2,12 @@ interface MPCAnnotation {
 	// represents a MUX node
 	public int MUX(int a, int b, boolean cond);
 
-	// is used to mark input variables
-	public void IN(int x);
-
 	// is used to mark output variables
 	public void OUT(int x);
 	
-	// just to get rid of not initialized error
-	public int FIX_NOT_INITIALIZED_ERROR();
+	// used to mark input variables (input vars should be assigned the return value)
+	// only use this method if java stops compiling because variables are not initialized
+	public int IN();
 }
 
 class MPCAnnotationImpl implements MPCAnnotation {
@@ -23,9 +21,6 @@ class MPCAnnotationImpl implements MPCAnnotation {
 		return (cond ? a : b);
 	}
 
-	public void IN(int x) {
-	}
-
 	public void OUT(int x) {
 	}
 
@@ -36,7 +31,7 @@ class MPCAnnotationImpl implements MPCAnnotation {
 		return v;
 	}
 	
-	public int FIX_NOT_INITIALIZED_ERROR() {
+	public int IN() {
 		return 100;
 	}
 }
@@ -47,10 +42,8 @@ public class P {
 
 	public static void main(String[] args) {
 		MPCAnnotation mpc = MPCAnnotationImpl.v();
-		int a = mpc.FIX_NOT_INITIALIZED_ERROR();
-		int b = mpc.FIX_NOT_INITIALIZED_ERROR();
-		mpc.IN(a);
-		mpc.IN(b);
+		int a = mpc.IN();
+		int b = mpc.IN();
 		
 		int c = a * b;
 		int flag = (c > 100) ? 1 : 0;
