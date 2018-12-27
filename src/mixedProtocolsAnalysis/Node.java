@@ -320,14 +320,12 @@ public class Node {
 				return;
 			}
 			else if(v.getMethod().getSignature().equals("<MPCAnnotation: void IN(int)>") 
-					|| v.getMethod().getSignature().equals("<MPCAnnotation: void IN(int[])>") 
-					|| v.getMethod().getSignature().equals("<MPCAnnotation: void IN(int[][])>")) {
+					|| v.getMethod().getSignature().equals("<MPCAnnotation: int FIX_NOT_INITIALIZED_ERROR()>") 
+					) {
 				nodeType = NodeType.IN;
 				return;
 			}
-			else if(v.getMethod().getSignature().equals("<MPCAnnotation: void OUT(int)>")
-					|| v.getMethod().getSignature().equals("<MPCAnnotation: void OUT(int[])>")
-					|| v.getMethod().getSignature().equals("<MPCAnnotation: void OUT(int[][])>")) {
+			else if(v.getMethod().getSignature().equals("<MPCAnnotation: void OUT(int)>")) {
 				nodeType = NodeType.OUT;
 				return;
 			}
