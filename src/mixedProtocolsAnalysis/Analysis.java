@@ -783,6 +783,11 @@ public class Analysis extends BodyTransformer {
 					toRemove.add(key);
 				}
 			}
+			else if(du.def.getNodeType() == Node.NodeType.MPC_ANNOTATION_INSTANTIATION) {
+				// this variable is just an instantiation of MPC Annotation utility,
+				// there is no need to output its def-use
+				toRemove.add(key);
+			}
 		}
 		for(Stmt item: toRemove) {
 			DefUse du = defUses.get(item);

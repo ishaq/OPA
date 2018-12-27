@@ -98,7 +98,7 @@ public class Node {
 		MUX(301),
 		
 		// Special nodes
-		IN(1000), OUT(1001);
+		MPC_ANNOTATION_INSTANTIATION(1000), IN(1001), OUT(1002);
 		
 		private final int value;
 
@@ -339,6 +339,12 @@ public class Node {
 		}
 
 		public void caseStaticInvokeExpr(StaticInvokeExpr v) {
+			// FIXME: these checks should be improved, intead of comparing to hard-coded signature,
+			// these should do something smarter.
+			if(v.getMethodRef().getSignature().equals("<MPCAnnotationImpl: MPCAnnotation v()>")) {
+				nodeType = NodeType.MPC_ANNOTATION_INSTANTIATION;
+				return;
+			}
 			defaultCase(v);
 		}
 

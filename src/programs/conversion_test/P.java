@@ -7,6 +7,9 @@ interface MPCAnnotation {
 
 	// is used to mark output variables
 	public void OUT(int x);
+	
+	// just to get rid of not initialized error
+	public int FIX_NOT_INITIALIZED_ERROR();
 }
 
 class MPCAnnotationImpl implements MPCAnnotation {
@@ -32,54 +35,26 @@ class MPCAnnotationImpl implements MPCAnnotation {
 		}
 		return v;
 	}
+	
+	public int FIX_NOT_INITIALIZED_ERROR() {
+		return 100;
+	}
 }
 
 public class P {
 	static final int len = 32;
 
-	public static int rem(int x, int y) {
-		MPCAnnotation mpc = MPCAnnotationImpl.v();
-		int rem = 0;
-		for (int j = len-1; j >= 0; j--) {
-			rem = rem << 1;
-			// rem[0] = x[j] // note that we use >>> for unsigned shift right
-			 rem = rem + ((x >>> j) & 1);
-			 
-//			 if (rem >= y) {
-//					rem = rem - y;
-//				}
-			
-			boolean geq = (rem >= y);
-			int rem2 = rem - y;
-			rem = mpc.MUX(rem2, rem, geq);
-			
-		}
-		return rem;
-	}
 
 	public static void main(String[] args) {
 		MPCAnnotation mpc = MPCAnnotationImpl.v();
-		int a = 100;
-		int b = 60;
+		int a = mpc.FIX_NOT_INITIALIZED_ERROR();
+		int b = mpc.FIX_NOT_INITIALIZED_ERROR();
 		mpc.IN(a);
 		mpc.IN(b);
-
-		int rem = 0;
-		for (int i = 0; i < len; i++) {
-//    		if (b != 0) {
-//    			int t = b;
-//    			b = rem(a, b);
-//    			a = t;
-//    		}
-			int temp = b;
-			boolean neq = (b != 0);
-			//rem = rem(a, b);
-			rem = a % b;
-			b = mpc.MUX(rem, b, neq);
-			a = mpc.MUX(temp, a, neq);
-		}
-
-		mpc.OUT(rem);
+		
+		int c = a * b;
+		int flag = (c > 100) ? 1 : 0;
+		mpc.OUT(flag);
 		//System.out.println("GCD of " + a + ", " + b + " is " + rem);
 	}
 }
