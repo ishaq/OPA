@@ -559,6 +559,20 @@ public class Node {
 		return w;
 	}
 	
+	@Override
+    public int hashCode() {
+		// hash code is the same as the instruction it encapsulates
+        return id.hashCode();
+    }
+	
+	@Override
+	public boolean equals(Object o) {
+		if(this == o) return true;
+		if(o == null || o.getClass() != getClass()) return false;
+		Node other = (Node)o;
+		return (id.equals(other.id));
+	}
+	
 	public String toString() {
 		String repr = "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + 
 				", order: " + useOrder + ", weight = " + weight + ", arrayWeight: " + getArrayWeight()

@@ -51,9 +51,9 @@ public class P {
 //					rem = rem - y;
 //				}
 			
-			boolean geq = (rem >= y);
+			boolean lt = (rem < y);
 			int rem2 = rem - y;
-			rem = mpc.MUX(rem2, rem, geq);
+			rem = mpc.MUX(rem, rem2, lt);
 			
 		}
 		return rem;
@@ -64,22 +64,23 @@ public class P {
 		int a = mpc.IN();
 		int b = mpc.IN();
 
-		int rem = 0;
+		int gcd = 0;
 		for (int i = 0; i < len; i++) {
 //    		if (b != 0) {
 //    			int t = b;
 //    			b = rem(a, b);
 //    			a = t;
 //    		}
-			int temp = b;
-			boolean neq = (b != 0);
-			rem = rem(a, b);
+			
+			gcd = rem(a, b);
 			//rem = a % b;
-			b = mpc.MUX(rem, b, neq);
+			boolean neq = (b != 0);
+			int temp = b;
+			b = mpc.MUX(gcd, b, neq);
 			a = mpc.MUX(temp, a, neq);
 		}
 
-		mpc.OUT(rem);
+		mpc.OUT(gcd);
 		//System.out.println("GCD of " + a + ", " + b + " is " + rem);
 	}
 }
