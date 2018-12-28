@@ -2,11 +2,12 @@ interface MPCAnnotation {
 	// represents a MUX node
 	public int MUX(int a, int b, boolean cond);
 
-	// is used to mark input variables
-	public void IN(int x);
-
 	// is used to mark output variables
 	public void OUT(int x);
+	
+	// used to mark input variables (input vars should be assigned the return value)
+	// only use this method if java stops compiling because variables are not initialized
+	public int IN();
 }
 
 class MPCAnnotationImpl implements MPCAnnotation {
@@ -20,9 +21,6 @@ class MPCAnnotationImpl implements MPCAnnotation {
 		return (cond ? a : b);
 	}
 
-	public void IN(int x) {
-	}
-
 	public void OUT(int x) {
 	}
 
@@ -31,6 +29,10 @@ class MPCAnnotationImpl implements MPCAnnotation {
 			v = new MPCAnnotationImpl();
 		}
 		return v;
+	}
+	
+	public int IN() {
+		return 100;
 	}
 }
 
@@ -59,10 +61,8 @@ public class P {
 
 	public static void main(String[] args) {
 		MPCAnnotation mpc = MPCAnnotationImpl.v();
-		int a = 100;
-		int b = 60;
-		mpc.IN(a);
-		mpc.IN(b);
+		int a = mpc.IN();
+		int b = mpc.IN();
 
 		int rem = 0;
 		for (int i = 0; i < len; i++) {
@@ -73,8 +73,8 @@ public class P {
 //    		}
 			int temp = b;
 			boolean neq = (b != 0);
-			//rem = rem(a, b);
-			rem = a % b;
+			rem = rem(a, b);
+			//rem = a % b;
 			b = mpc.MUX(rem, b, neq);
 			a = mpc.MUX(temp, a, neq);
 		}
