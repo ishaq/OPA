@@ -98,7 +98,8 @@ public class Node {
 		MUX(301),
 		
 		// Special nodes
-		MPC_ANNOTATION_INSTANTIATION(1000), IN(1001), OUT(1002);
+		MPC_ANNOTATION_INSTANTIATION(1000), IN(1001), OUT(1002),
+		INVALID_NODE(2000);
 		
 		private final int value;
 
@@ -152,7 +153,7 @@ public class Node {
 		}
 
 		public void caseIdentityStmt(IdentityStmt stmt) {
-			defaultCase(stmt);
+			nodeType = NodeType.SIMPLE_ASSIGN;
 		}
 
 		public void caseEnterMonitorStmt(EnterMonitorStmt stmt) {
@@ -164,7 +165,7 @@ public class Node {
 		}
 
 		public void caseGotoStmt(GotoStmt stmt) {
-			defaultCase(stmt);
+			nodeType = NodeType.OTHER;
 		}
 
 		public void caseIfStmt(IfStmt stmt) {
@@ -192,7 +193,7 @@ public class Node {
 		}
 
 		public void caseReturnVoidStmt(ReturnVoidStmt stmt) {
-			defaultCase(stmt);
+			nodeType = NodeType.OTHER;
 		}
 
 		public void caseTableSwitchStmt(TableSwitchStmt stmt) {
@@ -205,6 +206,7 @@ public class Node {
 
 		public void defaultCase(Object obj) {
 			System.out.println("Unhandled stmt: " + obj + " of type: " + obj.getClass());
+			nodeType = NodeType.INVALID_NODE;
 		}
 	}
 
@@ -229,7 +231,7 @@ public class Node {
 
 		// From AbstractJimpleValueSwitch
 		public void caseArrayRef(ArrayRef v) {
-			defaultCase(v);
+			nodeType = NodeType.LOCAL;
 		}
 
 		public void caseAddExpr(AddExpr v) {
@@ -361,11 +363,11 @@ public class Node {
 		}
 
 		public void caseNewArrayExpr(NewArrayExpr v) {
-			defaultCase(v);
+			nodeType = NodeType.OTHER;
 		}
 
 		public void caseNewMultiArrayExpr(NewMultiArrayExpr v) {
-			defaultCase(v);
+			nodeType = NodeType.OTHER;
 		}
 
 		public void caseNewExpr(NewExpr v) {
@@ -443,6 +445,7 @@ public class Node {
 
 		public void defaultCase(Object obj) {
 			System.out.println("Unhandled expr: " + obj + " of type: " + obj.getClass());
+			nodeType = NodeType.INVALID_NODE;
 		}
 
 	}

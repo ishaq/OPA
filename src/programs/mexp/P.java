@@ -37,7 +37,7 @@ class MPCAnnotationImpl implements MPCAnnotation {
 }
 
 public class P {
-	static final int len = 32;
+	static final int len = 64;
 	public static int rem(int x, int y) {
 		MPCAnnotation mpc = MPCAnnotationImpl.v();
 		int rem = 0;
@@ -69,8 +69,14 @@ public class P {
     	int mod = 10485760; // 2^20 * 10
     	int res = 1;
     	for(int i = len-1; i >= 0; i--) {
-    		res = mul_mod(res, res, mod);
-    		int cnd_mul = mul_mod(res, base, mod);
+    		//res = mul_mod(res, res, mod);
+    		int prod1 = res * res;
+    		res = rem(prod1, mod);
+    		
+    		//int cnd_mul = mul_mod(res, base, mod);
+    		int prod2 = res * base;
+    		int cnd_mul = rem(prod2, mod);
+    		
     		int bit_mask = 1 << i;
     		int int_flag = (exp & bit_mask);
     		boolean flag = int_flag != 0;

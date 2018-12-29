@@ -195,6 +195,9 @@ public class Analysis extends BodyTransformer {
 			SootMethod m = body.getMethod();
 			System.out.println("inside method: " + m.getSignature());
 			if (m.isMain()) {
+				
+				verifyAllNodesAreValid(body);
+				
 				// NOTE: this lookup used in serialization, the linear program (MATLAB) uses indices to uniquely 
 				// identify the nodes, I thought indices were easier/less-error-prone than using string representation
 				// of "id" field.
@@ -285,6 +288,16 @@ public class Analysis extends BodyTransformer {
 			e.printStackTrace();
 		}
 	}
+	
+	protected static void verifyAllNodesAreValid(Body body) throws UnsupportedFeatureException {
+		final PatchingChain<Unit> units = body.getUnits();
+		for(Unit u: units) {
+			Node n = new Node((Stmt)u);
+			if(n.nodeType == Node.NodeType.INVALID_NODE) {
+				throw new UnsupportedFeatureException("Can't handle the node: " + u);
+			}
+		}
+	}
 
 	protected static void printBodyInfo(Body body) throws Exception {
 		SootMethod m = body.getMethod();
@@ -322,7 +335,7 @@ public class Analysis extends BodyTransformer {
 		// System.out.println();
 		// }
 	}
-
+	
 	protected static Map<Stmt, DefUse> collectDefUses(Body body) throws IllegalArgumentException {
 		if ((body instanceof ShimpleBody) == false) {
 			throw new IllegalArgumentException("Not a shimple body");
