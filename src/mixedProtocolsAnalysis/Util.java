@@ -160,7 +160,8 @@ public class Util {
 	}
 	
 	public static ArrayList<Integer> getArraySizes(Unit s, ShimpleLocalDefs localDefs) throws UnsupportedFeatureException, RuntimeException {
-		if(((AssignStmt)s).getRightOp() instanceof NewArrayExpr) {
+		AssignStmt assign = (AssignStmt)s;
+		if(assign.getRightOp() instanceof NewArrayExpr) {
 			NewArrayExpr newArrayExpr = (NewArrayExpr)((AssignStmt)s).getRightOp();
 			Value sizeVal = newArrayExpr.getSize();
 			int sizeInt = guessConcreteValue(sizeVal, localDefs);
@@ -168,7 +169,7 @@ public class Util {
 			sizes.add(sizeInt);
 			return sizes;
 		}
-		else if(((AssignStmt)s).getRightOp() instanceof NewMultiArrayExpr) {
+		else if(assign.getRightOp() instanceof NewMultiArrayExpr) {
 			NewMultiArrayExpr newArrayExpr = (NewMultiArrayExpr)((AssignStmt)s).getRightOp();
 			List<Value> sizeVals = newArrayExpr.getSizes();
 			ArrayList<Integer> sizeInts = new ArrayList<Integer>(sizeVals.size());
@@ -177,21 +178,30 @@ public class Util {
 			}
 			return sizeInts;
 		}
-		else if(((AssignStmt)s).getRightOp() instanceof ArrayRef) {
+		else if(assign.getRightOp() instanceof ArrayRef) {
 			ArrayRef arrayRef = (ArrayRef)((AssignStmt)s).getRightOp();
 			Local l = (Local) arrayRef.getBase();
 			Unit def = localDefs.getDefsOf(l).get(0);
-			ArrayList sizes = getArraySizes(def, localDefs);
+			ArrayList<Integer> sizes = getArraySizes(def, localDefs);
 			// since this array is skipping one dimension, we should also skip one dimension
 			sizes.remove(0);
 			return sizes;
 		}
-		else if(((AssignStmt)s).getLeftOp() instanceof ArrayRef) {
+		else if(assign.getLeftOp() instanceof ArrayRef) {
 			// re-defn of an array, array dimension doesn't change
 			ArrayRef arrayRef = (ArrayRef)((AssignStmt)s).getLeftOp();
 			Local l = (Local) arrayRef.getBase();
 			Unit def = localDefs.getDefsOf(l).get(0);
-			ArrayList sizes = getArraySizes(def, localDefs);
+			ArrayList<Integer> sizes = getArraySizes(def, localDefs);
+			return sizes;
+		}
+		else if(assign.getLeftOp() instanceof Local // array copy statement
+				&& assign.getLeftOp().getType() instanceof ArrayType
+				&& assign.getRightOp() instanceof Local
+				&& assign.getRightOp().getType() instanceof ArrayType) {
+			Local l = (Local)assign.getRightOp();
+			Unit def = localDefs.getDefsOf(l).get(0);
+			ArrayList<Integer> sizes = getArraySizes(def, localDefs);
 			return sizes;
 		}
 		

@@ -1,10 +1,13 @@
 interface MPCAnnotation {
 	// represents a MUX node
 	public int MUX(int a, int b, boolean cond);
-	// is used to mark input variables
-	public void IN(int x);
+
 	// is used to mark output variables
 	public void OUT(int x);
+	
+	// used to mark input variables (input vars should be assigned the return value)
+	// only use this method if java stops compiling because variables are not initialized
+	public int IN();
 }
 
 class MPCAnnotationImpl implements MPCAnnotation {
@@ -17,10 +20,7 @@ class MPCAnnotationImpl implements MPCAnnotation {
 	public int MUX(int a, int b, boolean cond) {
 		return (cond ? a : b);
 	}
-	
-	public void IN(int x) {
-	}
-	
+
 	public void OUT(int x) {
 	}
 
@@ -30,22 +30,23 @@ class MPCAnnotationImpl implements MPCAnnotation {
 		}
 		return v;
 	}
+	
+	public int IN() {
+		return 100;
+	}
 }
 
+
 public class P {
-	static final int SIZE1 = 10;
-	static final int SIZE2 = 10;
-	
-	public static void init() {
-		// TODO: fill in the sets
-	}
+	static final int SIZE1 = 10; // alice/client
+	static final int SIZE2 = 500; // bob/server
 	
 	public static int contains(int[] haystack, int needle, int haystack_size) {
 		MPCAnnotation mpc = MPCAnnotationImpl.v();
 		int result = 0;
 		for(int i = 0; i < haystack_size; i++) {
 			boolean flag = (haystack[i] == needle);
-			result = mpc.MUX(1, 0, flag);
+			result = mpc.MUX(1, result, flag);
 		}
 		return result;
 	}
@@ -55,44 +56,22 @@ public class P {
 		
 		int[] pset1 = new int[SIZE1];
 		for(int i = 0; i < SIZE1; i++) {
-			mpc.IN(pset1[i]);
+			pset1[i] = mpc.IN();
 		}
 		int[] pset2 = new int[SIZE2];
 		for(int i = 0; i < SIZE2; i++) {
-			mpc.IN(pset2[i]);
+			pset2[i] = mpc.IN();
 		}
 		
 		int[] intersection = new int[SIZE1];
-		int size = 0;
 		for(int i = 0; i < SIZE1; i++) {
-			int flag1 = contains(pset2, pset1[i], SIZE2);
-			boolean flag2 = (flag1 == 1);
-			int newsize = size + 1;
-			int newvalue = pset1[i];
-			int value = mpc.MUX(newvalue, intersection[size], flag2);
-			size = mpc.MUX(newsize, size, flag2);
-			intersection[size] = value;
+			int result = contains(pset2, pset1[i], SIZE2);
+			intersection[i] = result;
 		}
 		
+		// alice learns the output
 		for(int i = 0; i < SIZE1; i++) {
 			mpc.OUT(intersection[i]);
 		}
-		mpc.OUT(size);
 	}
-	
-	// manually inlined version
-//	public static void main2(String[] args) {
-//		int[] intersection = new int[SIZE1];
-//		int size = 0;
-//		for(int i = 0; i < SIZE1; i++) {
-//			for(int j = 0; j < SIZE2; j ++) {
-//				boolean flag = (pset2[j] == pset1[i]);
-//				int newsize = size + 1;
-//				int newvalue = pset1[i];
-//				int value = MultiplexImpl.v().MUX(newvalue, intersection[size], flag);
-//				size = MultiplexImpl.v().MUX(newsize, size, flag);
-//				intersection[size] = value;
-//			}
-//		}
-//	}
 }
