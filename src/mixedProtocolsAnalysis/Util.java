@@ -195,15 +195,31 @@ public class Util {
 			ArrayList<Integer> sizes = getArraySizes(def, localDefs);
 			return sizes;
 		}
-		else if(assign.getLeftOp() instanceof Local // array copy statement
-				&& assign.getLeftOp().getType() instanceof ArrayType
-				&& assign.getRightOp() instanceof Local
-				&& assign.getRightOp().getType() instanceof ArrayType) {
-			Local l = (Local)assign.getRightOp();
-			Unit def = localDefs.getDefsOf(l).get(0);
-			ArrayList<Integer> sizes = getArraySizes(def, localDefs);
-			return sizes;
-		}
+		// NOTE: array copy statement should never occur because the array
+		// def-use collection code should take care of it internally.
+		// if an array copy slips through array def-use collection, it will never 
+		// go away (the copyPropagation code which does simple local variable matching
+		// cannot handle it properly). e.g. consider this
+		//  r1 = new array (int)[10];   (1)
+		//  ...
+		//  r1[$i1] = $i2               (2)
+		//  ...
+		//
+		//  r2 = r1
+		//
+		// the simple copyPropagation assumes r2 is a copy of r1 def (1)
+		// but this is semantically wrong, r1 has two definitions (1) and (2)
+		// it is a copy of the 2nd one.
+		
+//		else if(assign.getLeftOp() instanceof Local // array copy statement
+//				&& assign.getLeftOp().getType() instanceof ArrayType
+//				&& assign.getRightOp() instanceof Local
+//				&& assign.getRightOp().getType() instanceof ArrayType) {
+//			Local l = (Local)assign.getRightOp();
+//			Unit def = localDefs.getDefsOf(l).get(0);
+//			ArrayList<Integer> sizes = getArraySizes(def, localDefs);
+//			return sizes;
+//		}
 		
 		throw new UnsupportedFeatureException("Unknown array init statement: " + s);
 	}

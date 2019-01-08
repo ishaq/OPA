@@ -383,7 +383,7 @@ public class Analysis extends BodyTransformer {
 			final Unit u = iter.next();
 			Stmt s = (Stmt) u;
 			Local l = Util.getLocalCorrespondingToArrayDefStmt(s);
-			if (l != null) {
+			if (l != null && Util.isArrayCopyStatment(s) == false) { // array copies shall be handled below 
 				if(handledArrayDefs.contains(u)) {
 					continue;
 				}
@@ -404,8 +404,14 @@ public class Analysis extends BodyTransformer {
 					Local defL = Util.getLocalCorrespondingToArrayDefStmt((Stmt) item);
 					if (useL != null) {
 						if (localsToMatch.contains(useL)) {	
+							if(Util.isArrayCopyStatment((Stmt)item)) { // if this is a copy, we record it as a copy
+								thisDefUse.copies.add(defL);
+								localsToMatch.add(defL);
+							}
+							else {
 								Node use = new Node((Stmt) item);
 								thisDefUse.addUse(use);
+							}
 						}
 					} else if (defL != null) {
 						if (localsToMatch.contains(defL)) {
@@ -491,7 +497,10 @@ public class Analysis extends BodyTransformer {
 	 * 
 	 * y = y_1 - z_1 (gets rid of x and temp)
 	 * 
-	 * NOTE: right now only does it in the analysis (no code is transformed)
+	 * NOTE:
+	 *  (1) it can't handle array copies (but this is not an issue since array def-use collection takes care of copies 
+	 *  inside itself) 
+	 * 	(2) right now only does it in the analysis (no code is transformed)
 	 * 
 	 * @param defUses map containing def and uses
 	 * @return updated map of def uses, copies are marked
