@@ -205,9 +205,8 @@ public class Analysis extends BodyTransformer {
 				
 				// printBodyInfo(body);
 				
-				// TODO: scan body for call instructions, throw an exception if there is one (except the ones we allow e.g. MUX)
-				
 				Map<Stmt, DefUse> defUses = collectDefUses(body);
+				patchDefUsesForMUXNodes(body, defUses);
 				Map<Stmt, DefUse> arrayDefUses = collectArrayDefUses(body);
 				
 				// merge update def-use map
@@ -231,6 +230,7 @@ public class Analysis extends BodyTransformer {
 				// it is important that this is done last because previous steps may make use of those def/uses
 				defUses = removeDefUsesForLoopCountersVars((ShimpleBody)body, defUses);
 				defUses = finalizeOutput(defUses);
+				verifyOutputNodesAreValid(defUses);
 				
 				methodDefUses.put(m, defUses);
 				methodLoopInfo.put(m, loopInfo);
@@ -367,6 +367,33 @@ public class Analysis extends BodyTransformer {
 		}
 
 		return defUses;
+	}
+	
+	protected static void patchDefUsesForMUXNodes(Body body, Map<Stmt, DefUse> defUses) 
+			throws UnsupportedFeatureException {
+		ShimpleLocalDefs localDefs = new ShimpleLocalDefs((ShimpleBody)body);
+		for(Stmt key: defUses.keySet()) {
+			DefUse du = defUses.get(key);
+			patchDefUsesForMUXNodesHelper(du.def, localDefs, defUses);
+			for(Node use: du.getUses()) {
+				patchDefUsesForMUXNodesHelper(use, localDefs, defUses);
+			}
+		}
+		return;
+	}
+	
+	protected static void patchDefUsesForMUXNodesHelper(Node node, ShimpleLocalDefs localDefs, Map<Stmt, DefUse> defUses) 
+			throws UnsupportedFeatureException {
+		if(node.nodeType == NodeType.MUX) {
+			assert(node.associatedCondition != null);
+			Set<Local> condLocals = Util.getVariables(node.associatedCondition.getCondition());
+			for(Local l: condLocals) {
+				Unit otherNodeStmt = localDefs.getDefsOf(l).get(0);
+				DefUse otherDU = defUses.get((Stmt)otherNodeStmt);
+				assert(otherDU != null);
+				otherDU.addUse(node);
+			}
+		}
 	}
 
 	protected static Map<Stmt, DefUse> collectArrayDefUses(Body body) 
@@ -792,7 +819,7 @@ public class Analysis extends BodyTransformer {
 		return defUses;
 	}
 	
-	protected static Map<Stmt, DefUse> finalizeOutput(Map<Stmt, DefUse> defUses) {
+	protected static Map<Stmt, DefUse> finalizeOutput(Map<Stmt, DefUse> defUses) {		
 		Set<Stmt> toRemove = new HashSet<Stmt>();
 		for(Stmt key: defUses.keySet()) {
 			DefUse du = defUses.get(key);
@@ -820,6 +847,22 @@ public class Analysis extends BodyTransformer {
 			defUses.remove(item);
 		}
 		return defUses;
+	}
+	
+	protected static void verifyOutputNodesAreValid(Map<Stmt, DefUse> defUses) 
+			throws UnsupportedFeatureException {
+		for(Stmt key: defUses.keySet()) {
+			DefUse du = defUses.get(key);
+			if(du.def.nodeType == NodeType.INVALID_NODE || du.def.nodeType == NodeType.PSEUDO_PHI) {
+				throw new UnsupportedFeatureException("Invalid Node in the output: " + du.def);
+			}
+			
+			for(Node use: du.getUses()) {
+				if(use.nodeType == NodeType.INVALID_NODE || use.nodeType == NodeType.PSEUDO_PHI) {
+					throw new UnsupportedFeatureException("Invalid Node in the output: " + use);
+				}
+			}
+		}
 	}
 
 }

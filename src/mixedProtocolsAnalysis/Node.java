@@ -106,7 +106,7 @@ public class Node {
 	MUX(301),
 
 	// Special nodes
-	MPC_ANNOTATION_INSTANTIATION(1000), IN(1001), OUT(1002), INVALID_NODE(2000);
+	MPC_ANNOTATION_INSTANTIATION(1000), IN(1001), OUT(1002), INVALID_NODE(2000), PSEUDO_PHI(2001);
 
 		private final int value;
 
@@ -268,7 +268,7 @@ public class Node {
 				// we we can't find a divergenceCondition that dominates both the arguments to Phi,
 				// then we are dealing with a Phi that merges a loop counter. Since this Phi belong to a loop
 				// (instead of an if/else), this Phi is not a MUX (in the paper we call these pseudo-phi nodes).
-				this.nodeType = NodeType.OTHER;
+				this.nodeType = NodeType.PSEUDO_PHI;
 			}
 		}
 
@@ -635,6 +635,11 @@ public class Node {
 	public String toString() {
 		String repr = "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + ", order: " + useOrder
 				+ ", weight = " + weight + ", arrayWeight: " + getArrayWeight() + ")";
+		if(associatedCondition != null) {
+			repr = "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + ", order: " + useOrder
+					+ ", weight = " + weight + ", arrayWeight: " + getArrayWeight() + ")" 
+					+ " associatedCondition: " + associatedCondition.getCondition();
+		}
 		return repr;
 
 	}
