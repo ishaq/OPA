@@ -291,8 +291,9 @@ public class Analysis extends BodyTransformer {
 	
 	protected static void verifyAllNodesAreValid(Body body) throws UnsupportedFeatureException {
 		final PatchingChain<Unit> units = body.getUnits();
+		BriefUnitGraph cfg = new BriefUnitGraph(body);
 		for(Unit u: units) {
-			Node n = new Node((Stmt)u);
+			Node n = new Node((Stmt)u, cfg);
 			if(n.nodeType == Node.NodeType.INVALID_NODE) {
 				throw new UnsupportedFeatureException("Can't handle the node: " + u);
 			}
@@ -342,6 +343,7 @@ public class Analysis extends BodyTransformer {
 		}
 
 		ShimpleBody sb = (ShimpleBody) body;
+		BriefUnitGraph cfg = new BriefUnitGraph(sb);
 		ShimpleLocalDefs localDefs = new ShimpleLocalDefs(sb);
 		ShimpleLocalUses localUses = new ShimpleLocalUses(sb);
 
@@ -353,11 +355,11 @@ public class Analysis extends BodyTransformer {
 			List<UnitValueBoxPair> uses = localUses.getUsesOf(local);
 
 			// System.out.println("---- " + local + " -> " + defs.get(0));
-			DefUse du = new DefUse(local, (Stmt) defs.get(0));
+			DefUse du = new DefUse(local, (Stmt) defs.get(0), cfg);
 			for (UnitValueBoxPair u : uses) {
 				// System.out.println("<- unit: " + u.getUnit());
 				// System.out.println("<- value box: " + u.getValueBox());
-				Node use = new Node((Stmt) u.getUnit());
+				Node use = new Node((Stmt) u.getUnit(), cfg);
 				du.addUse(use);
 			}
 
@@ -388,7 +390,7 @@ public class Analysis extends BodyTransformer {
 					continue;
 				}
 				
-				DefUse thisDefUse = new DefUse(l, s);
+				DefUse thisDefUse = new DefUse(l, s, cfg);
 				thisDefUse.def.arrayDimensions = Util.getArraySizes(u, localDefs);
 				
 				arrayDefUses.put(thisDefUse.def.id, thisDefUse);
@@ -409,7 +411,7 @@ public class Analysis extends BodyTransformer {
 								localsToMatch.add(defL);
 							}
 							else {
-								Node use = new Node((Stmt) item);
+								Node use = new Node((Stmt) item, cfg);
 								thisDefUse.addUse(use);
 							}
 						}

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
-	<classpathentry excluding="programs/gcd/|programs/t01/|programs/t02/|programs/t03/|programs/tworoundbid/|programs/todo_biometric/|programs/todo_histogram/|programs/todo_mexp/|programs/todo_psi/|programs/moduler_exponentiation/|programs/biometric/|programs/psi/|programs/histogram/|programs/mexp/|programs/conversion_test/" kind="src" path="src"/>
+	<classpathentry excluding="programs/gcd/|programs/t01/|programs/t02/|programs/t03/|programs/tworoundbid/|programs/todo_biometric/|programs/todo_histogram/|programs/todo_mexp/|programs/todo_psi/|programs/moduler_exponentiation/|programs/biometric/|programs/psi/|programs/histogram/|programs/mexp/|programs/conversion_test/|programs/playground/" kind="src" path="src"/>
 	<classpathentry kind="lib" path="/home/ishaq/jars/sootclasses-trunk-jar-with-dependencies.jar" sourcepath="/home/ishaq/jars/sootclasses-trunk-sources.jar"/>
 	<classpathentry kind="lib" path="/home/ishaq/jars/gson-2.8.5.jar"/>
 	<classpathentry kind="lib" path="/home/ishaq/jars/junit-4.10.jar"/>

@@ -1,7 +1,11 @@
 package mixedProtocolsAnalysis;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
+import soot.Unit;
+import soot.UnitBox;
 import soot.Local;
 import soot.jimple.AbstractStmtSwitch;
 import soot.jimple.AddExpr;
@@ -69,6 +73,9 @@ import soot.jimple.VirtualInvokeExpr;
 import soot.jimple.XorExpr;
 import soot.shimple.AbstractShimpleValueSwitch;
 import soot.shimple.PhiExpr;
+import soot.toolkits.graph.BriefUnitGraph;
+import soot.toolkits.graph.DominatorsFinder;
+import soot.toolkits.graph.MHGDominatorsFinder;
 
 /**
  * represents a "def" node or a "use" node
@@ -78,29 +85,29 @@ import soot.shimple.PhiExpr;
  */
 public class Node {
 	/**
-	 * The values, CONSTANT and LOCAL, are only used here internally to figure out when a node is a
-	 * SIMPLE_ASSIGN type. These two values (i.e. CONSTANT and LOCAL) will never appear in the JSON output and
-	 * the node type will always be SIMPLE_ASSIGN. Therefore, no need to handle these in MATLAB
-	 * linear program
+	 * The values, CONSTANT and LOCAL, are only used here internally to figure out
+	 * when a node is a SIMPLE_ASSIGN type. These two values (i.e. CONSTANT and
+	 * LOCAL) will never appear in the JSON output and the node type will always be
+	 * SIMPLE_ASSIGN. Therefore, no need to handle these in MATLAB linear program
+	 * 
 	 * @author ishaq
 	 *
 	 */
 	public static enum NodeType {
-		OTHER(0),
-		// AbstractStmtSwitch
-		SIMPLE_ASSIGN(1),
-		// AbstractConstantSwitch
-		CONSTANT(101),
-		// AbstractJimpleValueSwitch
-		ADD(201), AND(202), CMP(203), DIV(204), EQ(205), GE(206), GT(207), LE(208), LT(209), MUL(210), NE(211), OR(
-				212), REM(213), SHL(214), SHR(215), SUB(216), USHR(217), XOR(218), NEG(219), LOCAL(220),
-		// AbstractShimpleValueSwitch
-		MUX(301),
-		
-		// Special nodes
-		MPC_ANNOTATION_INSTANTIATION(1000), IN(1001), OUT(1002),
-		INVALID_NODE(2000);
-		
+	OTHER(0),
+	// AbstractStmtSwitch
+	SIMPLE_ASSIGN(1),
+	// AbstractConstantSwitch
+	CONSTANT(101),
+	// AbstractJimpleValueSwitch
+	ADD(201), AND(202), CMP(203), DIV(204), EQ(205), GE(206), GT(207), LE(208), LT(209), MUL(210), NE(211), OR(212),
+	REM(213), SHL(214), SHR(215), SUB(216), USHR(217), XOR(218), NEG(219), LOCAL(220),
+	// AbstractShimpleValueSwitch
+	MUX(301),
+
+	// Special nodes
+	MPC_ANNOTATION_INSTANTIATION(1000), IN(1001), OUT(1002), INVALID_NODE(2000);
+
 		private final int value;
 
 		private NodeType(int value) {
@@ -114,8 +121,11 @@ public class Node {
 
 	public static class NodeStmtSwitch extends AbstractStmtSwitch {
 		private NodeType nodeType = NodeType.OTHER;
+		private IfStmt associatedCondition = null;
+		private BriefUnitGraph cfg;
 
-		public NodeStmtSwitch() {
+		public NodeStmtSwitch(BriefUnitGraph cfg) {
+			this.cfg = cfg;
 		}
 
 		public NodeType getNodeType() {
@@ -127,26 +137,19 @@ public class Node {
 		}
 
 		public void caseInvokeStmt(InvokeStmt stmt) {
-			NodeValueSwitch visitor = new NodeValueSwitch();
+			NodeValueSwitch visitor = new NodeValueSwitch(cfg);
 			stmt.getInvokeExpr().apply(visitor);
 			nodeType = visitor.getNodeType();
+			associatedCondition = visitor.associatedCondition;
 		}
 
 		public void caseAssignStmt(AssignStmt stmt) {
-			NodeValueSwitch visitor = new NodeValueSwitch();
+			NodeValueSwitch visitor = new NodeValueSwitch(cfg);
 			stmt.getRightOp().apply(visitor);
 			nodeType = visitor.getNodeType();
-			if (nodeType == NodeType.LOCAL || nodeType == NodeType.CONSTANT) { // if
-																					// RHS
-																					// is
-																					// a
-																					// simple
-																					// value
-																					// or
-																					// reference
-																					// (not
-																					// an
-																					// expression)
+			associatedCondition = visitor.associatedCondition;
+			if (nodeType == NodeType.LOCAL || nodeType == NodeType.CONSTANT) {
+				// if RHS is a simple value or reference (not an expression)
 				nodeType = NodeType.SIMPLE_ASSIGN;
 			}
 
@@ -169,9 +172,10 @@ public class Node {
 		}
 
 		public void caseIfStmt(IfStmt stmt) {
-			NodeValueSwitch visitor = new NodeValueSwitch();
+			NodeValueSwitch visitor = new NodeValueSwitch(cfg);
 			stmt.getCondition().apply(visitor);
 			nodeType = visitor.getNodeType();
+			associatedCondition = visitor.associatedCondition;
 		}
 
 		public void caseLookupSwitchStmt(LookupSwitchStmt stmt) {
@@ -187,9 +191,10 @@ public class Node {
 		}
 
 		public void caseReturnStmt(ReturnStmt stmt) {
-			NodeValueSwitch visitor = new NodeValueSwitch();
+			NodeValueSwitch visitor = new NodeValueSwitch(cfg);
 			stmt.getOp().apply(visitor);
 			nodeType = visitor.getNodeType();
+			associatedCondition = visitor.associatedCondition;
 		}
 
 		public void caseReturnVoidStmt(ReturnVoidStmt stmt) {
@@ -212,8 +217,11 @@ public class Node {
 
 	public static class NodeValueSwitch extends AbstractShimpleValueSwitch {
 		private NodeType nodeType = NodeType.OTHER;
+		private BriefUnitGraph cfg = null;
+		private IfStmt associatedCondition = null;
 
-		public NodeValueSwitch() {
+		public NodeValueSwitch(BriefUnitGraph cfg) {
+			this.cfg = cfg;
 		}
 
 		public NodeType getNodeType() {
@@ -222,11 +230,46 @@ public class Node {
 
 		// From AbstractShimpleValueSwitch
 		public void casePhiExpr(PhiExpr v) {
-			// Phi is *not* a MUX node. MUX is a way for
-			// if/else. Phi is a merge node for multiple paths.
-			// MPC does not have multiple paths. Therefore MPC
-			// does not have Phi nodes.
-			nodeType = NodeType.OTHER;
+			List<UnitBox> unitBoxes = v.getUnitBoxes();
+			if(unitBoxes.size() != 2)  {
+				System.out.println("we only support 2 arguments for Phi Node. " 
+						+ v + " has " + unitBoxes.size());
+				nodeType = NodeType.INVALID_NODE;
+			}
+			
+			DominatorsFinder<Unit> df = new MHGDominatorsFinder<Unit>(cfg);
+			Unit first = unitBoxes.get(0).getUnit();
+			Unit second = unitBoxes.get(1).getUnit();
+			
+			
+			IfStmt divergenceCondition = null;
+			
+			Unit firstRunner = first,
+					secondRunner = second;
+			while(firstRunner != null && secondRunner != null) {
+				firstRunner = df.getImmediateDominator(firstRunner);
+				if(firstRunner instanceof IfStmt && df.isDominatedBy(second, firstRunner)) {
+					divergenceCondition = (IfStmt)firstRunner;
+					break;
+				}
+				
+				secondRunner = df.getImmediateDominator(secondRunner);
+				if(secondRunner instanceof IfStmt && df.isDominatedBy(first, secondRunner)) {
+					divergenceCondition = (IfStmt)secondRunner;
+					break;
+				}
+			}
+			
+			if(divergenceCondition != null) {
+				this.associatedCondition = divergenceCondition;
+				this.nodeType = NodeType.MUX;
+			}
+			else {
+				// we we can't find a divergenceCondition that dominates both the arguments to Phi,
+				// then we are dealing with a Phi that merges a loop counter. Since this Phi belong to a loop
+				// (instead of an if/else), this Phi is not a MUX (in the paper we call these pseudo-phi nodes).
+				this.nodeType = NodeType.OTHER;
+			}
 		}
 
 		// From AbstractJimpleValueSwitch
@@ -315,17 +358,13 @@ public class Node {
 		}
 
 		public void caseInterfaceInvokeExpr(InterfaceInvokeExpr v) {
-			// FIXME: these checks should be improved. instead of comparing to hardcoded signatures,
+			// FIXME: these checks should be improved. instead of comparing to hard-coded
+			// signatures,
 			// these should do something smarter
-			if(v.getMethodRef().getSignature().equals("<MPCAnnotation: int MUX(int,int,boolean)>")) {
-				nodeType = NodeType.MUX;
-				return;
-			}
-			else if(v.getMethod().getSignature().equals("<MPCAnnotation: int IN()>")) {
+			if (v.getMethod().getSignature().equals("<MPCAnnotation: int IN()>")) {
 				nodeType = NodeType.IN;
 				return;
-			}
-			else if(v.getMethod().getSignature().equals("<MPCAnnotation: void OUT(int)>")) {
+			} else if (v.getMethod().getSignature().equals("<MPCAnnotation: void OUT(int)>")) {
 				nodeType = NodeType.OUT;
 				return;
 			}
@@ -337,9 +376,10 @@ public class Node {
 		}
 
 		public void caseStaticInvokeExpr(StaticInvokeExpr v) {
-			// FIXME: these checks should be improved, instead of comparing to hard-coded signature,
+			// FIXME: these checks should be improved, instead of comparing to hard-coded
+			// signature,
 			// these should do something smarter.
-			if(v.getMethodRef().getSignature().equals("<MPCAnnotationImpl: MPCAnnotation v()>")) {
+			if (v.getMethodRef().getSignature().equals("<MPCAnnotationImpl: MPCAnnotation v()>")) {
 				nodeType = NodeType.MPC_ANNOTATION_INSTANTIATION;
 				return;
 			}
@@ -451,12 +491,17 @@ public class Node {
 	}
 
 	/**
-	 * the instruction corresponding to the node, used to identify the node
-	 * (both def and use)
+	 * the instruction corresponding to the node, used to identify the node (both
+	 * def and use)
 	 */
 	protected Stmt id;
 
 	protected NodeType nodeType = NodeType.OTHER;
+	/**
+	 * if nodeType is 'MUX', then it would have an associated condition that determines 
+	 * which argument of Phi gets chosen. for all other cases, this condition is null
+	 */
+	protected IfStmt associatedCondition = null;
 
 	/**
 	 * line number corresponding to the node, mostly for debugging eas
@@ -467,44 +512,46 @@ public class Node {
 	 * weight of this node
 	 */
 	protected int weight = 1;
-	
+
 	/**
 	 * represents rank of a use (if this node is a "use" node.).
 	 * 
-	 * use orders are used to sort the use nodes to correctly identify min-cut for conversions and
-	 * compute subsumption as appropriate
+	 * use orders are used to sort the use nodes to correctly identify min-cut for
+	 * conversions and compute subsumption as appropriate
 	 */
-	protected int useOrder = -1; 
+	protected int useOrder = -1;
 
 	/**
-	 * the instruction before which conversion (if any) for def-use edge should
-	 * be placed. this field is only defined if this object represents a "use",
-	 * it is null for a "def"
+	 * the instruction before which conversion (if any) for def-use edge should be
+	 * placed. this field is only defined if this object represents a "use", it is
+	 * null for a "def"
 	 */
 	protected Stmt conversionPoint = null;
-	
-	// TODO: currently we keep both these variables here for convenience, 
-	// but once we start exporting all nodes (currently we only export def/uses that we need, not all of them),
-	// we should get rid of these
+
+	// TODO: currently we keep both these variables here for convenience,
+	// but once we start exporting all nodes (currently we only export def/uses that
+	// we need, not all of them), we should get rid of these
 	protected int conversionWeight = 1;
 	protected int conversionParallelParam = 1;
-	
+
 	/**
 	 * parallelization parameter, this is less than or equal to weight and indicates
 	 * how many executions (of weight) may be in parallel.
 	 */
 	protected int parallelParam = 1;
-	
+
 	/**
-	 * contains the array dimensions, this is only applicable if this node represents definition of an array
+	 * contains the array dimensions, this is only applicable if this node
+	 * represents definition of an array
 	 */
 	protected ArrayList<Integer> arrayDimensions = null;
 
-	public Node(Stmt stmt) {
+	public Node(Stmt stmt, BriefUnitGraph cfg) {
 		this.id = stmt;
-		NodeStmtSwitch visitor = new NodeStmtSwitch();
+		NodeStmtSwitch visitor = new NodeStmtSwitch(cfg);
 		stmt.apply(visitor);
 		this.nodeType = visitor.getNodeType();
+		this.associatedCondition = visitor.associatedCondition;
 	}
 
 	public Stmt getId() {
@@ -530,7 +577,7 @@ public class Node {
 	public Stmt getConversionPoint() {
 		return conversionPoint;
 	}
-	
+
 	public int getUseOrder() {
 		return useOrder;
 	}
@@ -542,44 +589,52 @@ public class Node {
 	public void setConversionPoint(Stmt conversionPoint) {
 		this.conversionPoint = conversionPoint;
 	}
-	
+
 	public int getParallelParam() {
 		return parallelParam;
 	}
-	
+
 	public void setParallelParam(int parallelParam) {
 		this.parallelParam = parallelParam;
 	}
+	
+	/**
+	 * @return associated condition (valid only if the nodeType is MUX)
+	 */
+	public IfStmt getAssociatedCondition() {
+		return this.associatedCondition;
+	}
 
 	public int getArrayWeight() {
-		if(arrayDimensions == null) {
+		if (arrayDimensions == null) {
 			return 1;
 		}
 		int w = 1;
-		for(int d: arrayDimensions) {
+		for (int d : arrayDimensions) {
 			w = w * d;
 		}
 		return w;
 	}
-	
+
 	@Override
-    public int hashCode() {
+	public int hashCode() {
 		// hash code is the same as the instruction it encapsulates
-        return id.hashCode();
-    }
-	
+		return id.hashCode();
+	}
+
 	@Override
 	public boolean equals(Object o) {
-		if(this == o) return true;
-		if(o == null || o.getClass() != getClass()) return false;
-		Node other = (Node)o;
+		if (this == o)
+			return true;
+		if (o == null || o.getClass() != getClass())
+			return false;
+		Node other = (Node) o;
 		return (id.equals(other.id));
 	}
-	
+
 	public String toString() {
-		String repr = "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + 
-				", order: " + useOrder + ", weight = " + weight + ", arrayWeight: " + getArrayWeight()
-				+ ")";
+		String repr = "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + ", order: " + useOrder
+				+ ", weight = " + weight + ", arrayWeight: " + getArrayWeight() + ")";
 		return repr;
 
 	}

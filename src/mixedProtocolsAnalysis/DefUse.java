@@ -6,6 +6,7 @@ import java.util.Set;
 
 import soot.Local;
 import soot.jimple.Stmt;
+import soot.toolkits.graph.BriefUnitGraph;
 
 /**
  * definition and uses of a Local
@@ -19,9 +20,9 @@ public class DefUse {
 	
 	protected final Set<Node> uses = new HashSet<Node>();
 	
-	public DefUse(Local var, Stmt defn) {
+	public DefUse(Local var, Stmt defn, BriefUnitGraph cfg) {
 		this.var = var;
-		this.def = new Node(defn);
+		this.def = new Node(defn, cfg);
 	}
 	
 	public void addUse(Node use) {
