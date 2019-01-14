@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import mixedProtocolsAnalysis.Node.NodeType;
 import soot.Local;
 import soot.jimple.Stmt;
 import soot.toolkits.graph.BriefUnitGraph;

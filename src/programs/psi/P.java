@@ -1,12 +1,10 @@
 interface MPCAnnotation {
-	// represents a MUX node
-	public int MUX(int a, int b, boolean cond);
-
 	// is used to mark output variables
 	public void OUT(int x);
 	
 	// used to mark input variables (input vars should be assigned the return value)
-	// only use this method if java stops compiling because variables are not initialized
+	// it's a convenient method to shutup the compiler when it complains that variables 
+	// are not initialized
 	public int IN();
 }
 
@@ -14,11 +12,6 @@ class MPCAnnotationImpl implements MPCAnnotation {
 	private static MPCAnnotation v = null;
 
 	private MPCAnnotationImpl() {
-
-	}
-
-	public int MUX(int a, int b, boolean cond) {
-		return (cond ? a : b);
 	}
 
 	public void OUT(int x) {
@@ -32,7 +25,7 @@ class MPCAnnotationImpl implements MPCAnnotation {
 	}
 	
 	public int IN() {
-		return 100;
+		return 57; // Grothendieck Prime
 	}
 }
 
@@ -42,11 +35,11 @@ public class P {
 	static final int SIZE2 = 500; // bob/server
 	
 	public static int contains(int[] haystack, int needle, int haystack_size) {
-		MPCAnnotation mpc = MPCAnnotationImpl.v();
 		int result = 0;
 		for(int i = 0; i < haystack_size; i++) {
-			boolean flag = (haystack[i] == needle);
-			result = mpc.MUX(1, result, flag);
+			if(haystack[i] == needle) {
+				result = 1;
+			}
 		}
 		return result;
 	}

@@ -46,7 +46,7 @@ public class Tests extends TestCase {
 		args[i++] = "-O";
 		// -cp specifies the class path. Must include a path to the application classes, and the rt.jar
 		args[i++] = "-cp";
-		args[i++] = "./src/programs/playground/:"+RT_HOME;
+		args[i++] = "./src/programs/psi/:"+RT_HOME;
 		// specifies the class that contains the "main" method
 		args[i++] = "P";
  		Main.main(args);

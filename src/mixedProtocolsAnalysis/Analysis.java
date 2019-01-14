@@ -230,7 +230,6 @@ public class Analysis extends BodyTransformer {
 				// it is important that this is done last because previous steps may make use of those def/uses
 				defUses = removeDefUsesForLoopCountersVars((ShimpleBody)body, defUses);
 				defUses = finalizeOutput(defUses);
-				verifyOutputNodesAreValid(defUses);
 				
 				methodDefUses.put(m, defUses);
 				methodLoopInfo.put(m, loopInfo);
@@ -372,21 +371,28 @@ public class Analysis extends BodyTransformer {
 	protected static void patchDefUsesForMUXNodes(Body body, Map<Stmt, DefUse> defUses) 
 			throws UnsupportedFeatureException {
 		ShimpleLocalDefs localDefs = new ShimpleLocalDefs((ShimpleBody)body);
+		LoopHelper lh = new LoopHelper(body);
+		Set<Local> loopVars = lh.getAllLoopCounterVariables(defUses);
+		
 		for(Stmt key: defUses.keySet()) {
 			DefUse du = defUses.get(key);
-			patchDefUsesForMUXNodesHelper(du.def, localDefs, defUses);
+			patchDefUsesForMUXNodesHelper(du.def, localDefs, loopVars, defUses);
 			for(Node use: du.getUses()) {
-				patchDefUsesForMUXNodesHelper(use, localDefs, defUses);
+				patchDefUsesForMUXNodesHelper(use, localDefs, loopVars, defUses);
 			}
 		}
 		return;
 	}
 	
-	protected static void patchDefUsesForMUXNodesHelper(Node node, ShimpleLocalDefs localDefs, Map<Stmt, DefUse> defUses) 
+	protected static void patchDefUsesForMUXNodesHelper(Node node, ShimpleLocalDefs localDefs, 
+			Set<Local> loopVars, Map<Stmt, DefUse> defUses) 
 			throws UnsupportedFeatureException {
 		if(node.nodeType == NodeType.MUX) {
 			assert(node.associatedCondition != null);
 			Set<Local> condLocals = Util.getVariables(node.associatedCondition.getCondition());
+			if(loopVars.containsAll(condLocals)) {
+				node.nodeType = Node.NodeType.PSEUDO_PHI; // only depends on loop counters, therefore, pseudo-phi
+			}
 			for(Local l: condLocals) {
 				Unit otherNodeStmt = localDefs.getDefsOf(l).get(0);
 				DefUse otherDU = defUses.get((Stmt)otherNodeStmt);
@@ -823,6 +829,7 @@ public class Analysis extends BodyTransformer {
 		Set<Stmt> toRemove = new HashSet<Stmt>();
 		for(Stmt key: defUses.keySet()) {
 			DefUse du = defUses.get(key);
+			
 			if(du.uses.size() == 0) { // no need to include defs that have no uses
 				toRemove.add(key);
 			}
@@ -848,21 +855,4 @@ public class Analysis extends BodyTransformer {
 		}
 		return defUses;
 	}
-	
-	protected static void verifyOutputNodesAreValid(Map<Stmt, DefUse> defUses) 
-			throws UnsupportedFeatureException {
-		for(Stmt key: defUses.keySet()) {
-			DefUse du = defUses.get(key);
-			if(du.def.nodeType == NodeType.INVALID_NODE || du.def.nodeType == NodeType.PSEUDO_PHI) {
-				throw new UnsupportedFeatureException("Invalid Node in the output: " + du.def);
-			}
-			
-			for(Node use: du.getUses()) {
-				if(use.nodeType == NodeType.INVALID_NODE || use.nodeType == NodeType.PSEUDO_PHI) {
-					throw new UnsupportedFeatureException("Invalid Node in the output: " + use);
-				}
-			}
-		}
-	}
-
 }

@@ -201,14 +201,21 @@ public class LoopHelper {
 		return thisLoopCounterVars;
 	}
 	
-	public Set<Stmt> getAllLoopCounterVariableDefStmts(Map<Stmt, DefUse> defUses)  throws UnsupportedFeatureException {
-		Set<Stmt> loopCounterVarDefs = new HashSet<Stmt>();
+	public Set<Local> getAllLoopCounterVariables(Map<Stmt, DefUse> defUses) throws UnsupportedFeatureException {
+		Set<Local> loopCounterVars = new HashSet<Local>();
 		for(Loop l: this.loopsTree) {
 			Set<Local> vars = getLoopCounterVariables(l, defUses);
-			for(Local v: vars) {
-				Unit u = localDefs.getDefsOf(v).get(0);
-				loopCounterVarDefs.add((Stmt)u);
-			}
+			loopCounterVars.addAll(vars);
+		}
+		return loopCounterVars;
+	}
+	
+	public Set<Stmt> getAllLoopCounterVariableDefStmts(Map<Stmt, DefUse> defUses) throws UnsupportedFeatureException {
+		Set<Local> loopCounterVars = getAllLoopCounterVariables(defUses);
+		Set<Stmt> loopCounterVarDefs = new HashSet<Stmt>();
+		for(Local l: loopCounterVars) {
+			Unit u = localDefs.getDefsOf(l).get(0);
+			loopCounterVarDefs.add((Stmt)u);
 		}
 		return loopCounterVarDefs;
 	}

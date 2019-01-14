@@ -261,6 +261,10 @@ public class Node {
 			}
 			
 			if(divergenceCondition != null) {
+				// We found the divergence condition. This Phi node is probably a MUX.
+				// NOTE: this Phi node can still be a pseudo-phi node, this is checked later by 
+				// checking if all variables in the associated condition are loop counters
+				// But at this point we can't do better than marking it as 'probable' MUX
 				this.associatedCondition = divergenceCondition;
 				this.nodeType = NodeType.MUX;
 			}
