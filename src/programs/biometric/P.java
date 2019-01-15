@@ -1,26 +1,19 @@
 interface MPCAnnotation {
-	// represents a MUX node
-	public int MUX(int a, int b, boolean cond);
-	// is used to mark input variables
-	public void IN(int x);
 	// is used to mark output variables
 	public void OUT(int x);
+	
+	// used to mark input variables (input vars should be assigned the return value)
+	// it's a convenient method to shutup the compiler when it complains that variables 
+	// are not initialized
+	public int IN();
 }
 
 class MPCAnnotationImpl implements MPCAnnotation {
 	private static MPCAnnotation v = null;
 
 	private MPCAnnotationImpl() {
-
 	}
 
-	public int MUX(int a, int b, boolean cond) {
-		return (cond ? a : b);
-	}
-	
-	public void IN(int x) {
-	}
-	
 	public void OUT(int x) {
 	}
 
@@ -29,6 +22,10 @@ class MPCAnnotationImpl implements MPCAnnotation {
 			v = new MPCAnnotationImpl();
 		}
 		return v;
+	}
+	
+	public int IN() {
+		return 57; // Grothendieck Prime
 	}
 }
 
@@ -61,7 +58,7 @@ public class P {
 //			S_sqr[i] = sqr_sum;
 //		}
 		for(int i = 0; i < size; i++) {
-			mpc.IN(S_sqr[i]);
+			S_sqr[i] = mpc.IN();
 		}
 		
 		int C_sqr = 0;
@@ -69,14 +66,14 @@ public class P {
 //			int sqr = C[i] * C[i];
 //			C_sqr = C_sqr + sqr;
 //		}
-		mpc.IN(C_sqr);
+		C_sqr = mpc.IN();
 		
 		int[] twoC = new int[dim];
 //		for (int i = 0; i < dim; i++) {
 //			twoC[i] = 2 * C[i];
 //		}
 		for(int i = 0; i < dim; i++) {
-			mpc.IN(twoC[i]);
+			twoC[i] = mpc.IN();
 		}
 		// -- INPUT PREPROCESSING END --
 
@@ -97,8 +94,12 @@ public class P {
 		int minIndex = 0;
 		for (int k = 1; k < size; k++) {
 			boolean flag = D[k] < minDiff;
-			minDiff = mpc.MUX(D[k], minDiff, flag);
-			minIndex = mpc.MUX(k, minIndex, flag);
+			if(D[k] < minDiff) {
+				minDiff = D[k];
+				minIndex = k;
+			}
+//			minDiff = mpc.MUX(D[k], minDiff, flag);
+//			minIndex = mpc.MUX(k, minIndex, flag);
 		}
 		// -- MPC PORTION END --
 		

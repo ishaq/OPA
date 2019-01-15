@@ -33,9 +33,11 @@ import soot.Local;
 import soot.PatchingChain;
 import soot.SootMethod;
 import soot.Unit;
+import soot.BooleanType;
 import soot.jimple.AssignStmt;
 import soot.jimple.IfStmt;
 import soot.jimple.Stmt;
+import soot.jimple.internal.JimpleLocal;
 import soot.jimple.toolkits.annotation.logic.Loop;
 import soot.shimple.ShimpleBody;
 import soot.shimple.toolkits.scalar.ShimpleLocalDefs;
@@ -251,7 +253,7 @@ public class Analysis extends BodyTransformer {
 			Map<Stmt, DefUse> defUses = methodDefUses.get(m);
 			for (Stmt stmt : defUses.keySet()) {
 				DefUse thisDefUse = defUses.get(stmt);
-				System.out.println("    " + thisDefUse.def.id + " copies: " + thisDefUse.getCopies() + "");
+				System.out.println("    " + thisDefUse.def.id + " local: " + thisDefUse.var + " copies: " + thisDefUse.getCopies() + "");
 				System.out.println("     def: " + thisDefUse.getDef());
 				for (Node use : thisDefUse.getUses()) {
 					System.out.println("     use: " + use);
@@ -371,21 +373,25 @@ public class Analysis extends BodyTransformer {
 	protected static void patchDefUsesForMUXNodes(Body body, Map<Stmt, DefUse> defUses) 
 			throws UnsupportedFeatureException {
 		ShimpleLocalDefs localDefs = new ShimpleLocalDefs((ShimpleBody)body);
+		BriefUnitGraph cfg = new BriefUnitGraph(body);
 		LoopHelper lh = new LoopHelper(body);
 		Set<Local> loopVars = lh.getAllLoopCounterVariables(defUses);
 		
+		Map<Stmt, DefUse> newDefUses = new HashMap<Stmt, DefUse>();
 		for(Stmt key: defUses.keySet()) {
 			DefUse du = defUses.get(key);
-			patchDefUsesForMUXNodesHelper(du.def, localDefs, loopVars, defUses);
+			patchDefUsesForMUXNodesHelper(du.def, localDefs, cfg, loopVars, defUses, newDefUses);
 			for(Node use: du.getUses()) {
-				patchDefUsesForMUXNodesHelper(use, localDefs, loopVars, defUses);
+				patchDefUsesForMUXNodesHelper(use, localDefs, cfg, loopVars, defUses, newDefUses);
 			}
 		}
+		
+		defUses.putAll(newDefUses);
 		return;
 	}
 	
-	protected static void patchDefUsesForMUXNodesHelper(Node node, ShimpleLocalDefs localDefs, 
-			Set<Local> loopVars, Map<Stmt, DefUse> defUses) 
+	protected static void patchDefUsesForMUXNodesHelper(Node node, ShimpleLocalDefs localDefs, BriefUnitGraph cfg, 
+			Set<Local> loopVars, Map<Stmt, DefUse> defUses, Map<Stmt, DefUse> newDefUses) 
 			throws UnsupportedFeatureException {
 		if(node.nodeType == NodeType.MUX) {
 			assert(node.associatedCondition != null);
@@ -393,12 +399,16 @@ public class Analysis extends BodyTransformer {
 			if(loopVars.containsAll(condLocals)) {
 				node.nodeType = Node.NodeType.PSEUDO_PHI; // only depends on loop counters, therefore, pseudo-phi
 			}
-			for(Local l: condLocals) {
-				Unit otherNodeStmt = localDefs.getDefsOf(l).get(0);
-				DefUse otherDU = defUses.get((Stmt)otherNodeStmt);
-				assert(otherDU != null);
-				otherDU.addUse(node);
+			
+			DefUse newDU = newDefUses.get(node.associatedCondition);
+			if(newDU == null) {
+				Local flag = new JimpleLocal(node.associatedCondition.getCondition().toString(), BooleanType.v());
+				newDU = new DefUse(flag, node.associatedCondition, cfg);
+				newDefUses.put(newDU.def.id, newDU);
 			}
+			
+			// MUX is a use of this def
+			newDU.addUse(node);
 		}
 	}
 

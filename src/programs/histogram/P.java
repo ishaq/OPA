@@ -1,23 +1,31 @@
-interface Multiplex {
-	public int MUX(int a, int b, boolean cond);
+interface MPCAnnotation {
+	// is used to mark output variables
+	public void OUT(int x);
+	
+	// used to mark input variables (input vars should be assigned the return value)
+	// it's a convenient method to shutup the compiler when it complains that variables 
+	// are not initialized
+	public int IN();
 }
 
-class MultiplexImpl implements Multiplex {
-	private static Multiplex v = null;
+class MPCAnnotationImpl implements MPCAnnotation {
+	private static MPCAnnotation v = null;
 
-	private MultiplexImpl() {
-
+	private MPCAnnotationImpl() {
 	}
 
-	public int MUX(int a, int b, boolean cond) {
-		return (cond ? a : b);
+	public void OUT(int x) {
 	}
 
-	public static Multiplex v() {
+	public static MPCAnnotation v() {
 		if (v == null) {
-			v = new MultiplexImpl();
+			v = new MPCAnnotationImpl();
 		}
 		return v;
+	}
+	
+	public int IN() {
+		return 57; // Grothendieck Prime
 	}
 }
 
@@ -29,10 +37,6 @@ public class P {
 
 	static final int INTERVALS = 2;
 	
-	public static void init(int[][] reviews) {
-		// initialize reviews
-	}
-	
 	/* returns val/mod, integer division */
 	public static int quot(int val, int mod) {
 		int quot = 0;
@@ -42,11 +46,16 @@ public class P {
 			rem = rem << 1;
 			// rem[0] = val[j]
 			rem = rem + ((val >> j) & 1); // EMPHASIS HERE
-			boolean flag = (rem >= mod);
+			
 			int newrem = rem - mod;
 			int newquot = quot + 1;
-			rem = MultiplexImpl.v().MUX(newrem, rem, flag);
-			quot = MultiplexImpl.v().MUX(newquot, quot, flag);
+			if(rem >= mod) {
+				rem = newrem;
+				quot = newquot;
+			}
+//			boolean flag = (rem >= mod);
+//			rem = MultiplexImpl.v().MUX(newrem, rem, flag);
+//			quot = MultiplexImpl.v().MUX(newquot, quot, flag);
 		}
 		return quot;
 	}
@@ -78,24 +87,34 @@ public class P {
 		for (int j = 0; j < INTERVALS; j++) {
 			int low = j * sumRatings;
 			int high = (j + 1) * sumRatings;
+//			if (low <= num && num < high) {
+//			bucket = m + j;
+//		}
 			boolean lowerBoundFlag = (low <= num);
 			boolean upperBoundFlag = (high > num);
-			boolean betweenBoundsFlag = lowerBoundFlag && upperBoundFlag;
-//			if (low <= num && num < high) {
-//				bucket = m + j;
-//			}
-			bucket = MultiplexImpl.v().MUX(j + m, bucket, betweenBoundsFlag);
+			if((lowerBoundFlag && upperBoundFlag) == true) {
+				bucket = m + j;
+			}
+
+//			bucket = MultiplexImpl.v().MUX(j + m, bucket, betweenBoundsFlag);
 		}
 
 		return bucket;
 	}
 
 	public static void main(String[] args) {
+		
+		MPCAnnotation mpc = MPCAnnotationImpl.v();
 
-		/* 100 reviwers each giving 100 ratings */
+		/* 100 reviewers each giving 100 ratings */
 		int[][] reviews = new int[NUM_REVIEWERS][NUM_RATINGS];
 
-		init(reviews);
+		// INPUT
+		for(int i = 0; i < NUM_REVIEWERS; i++) {
+			for(int j = 0; j < NUM_RATINGS; i++) {
+				reviews[i][j] = mpc.IN();
+			}
+		}
 
 		/* buckets from 0 to 8 */
 		int size = INTERVALS * 5 - 1;
@@ -104,12 +123,18 @@ public class P {
 		for (int i = 0; i < NUM_REVIEWERS; i++) {
 			int bucket = map(reviews[i]);
 			for (int j = 0; j < size; j++) {
-//				if (j == bucket) {
-//					result[j] = result[j] + 1;
-//				}
-				result[j] = MultiplexImpl.v().MUX(result[j] + 1, result[j], (j == bucket));
+				int newResultJ = result[j] + 1;
+				if (j == bucket) {
+					result[j] = newResultJ;
+				}
+//				result[j] = MultiplexImpl.v().MUX(result[j] + 1, result[j], (j == bucket));
 			}
 
+		}
+		
+		// OUTPUT
+		for(int i = 0; i < size; i++) {
+			mpc.OUT(result[i]);
 		}
 
 	}
