@@ -4,7 +4,8 @@ interface MPCAnnotation {
 	
 	// used to mark input variables (input vars should be assigned the return value)
 	// it's a convenient method to shutup the compiler when it complains that variables 
-	// are not initialized
+	// are not initialized. it also helps in recognizing  which variables are 
+	// input variables when one is looking at shimple code.
 	public int IN();
 }
 
@@ -36,6 +37,8 @@ public class P {
 	static final int NUM_RATINGS = 100;
 
 	static final int INTERVALS = 2;
+	/* buckets from 0 to 8 */
+	static final int NUM_BUCKETS = (INTERVALS * 5) - 1;
 	
 	/* returns val/mod, integer division */
 	public static int quot(int val, int mod) {
@@ -48,7 +51,7 @@ public class P {
 			rem = rem + ((val >> j) & 1); // EMPHASIS HERE
 			
 			int newrem = rem - mod;
-			int newquot = quot + 1;
+			int newquot = (quot | (1 << j));
 			if(rem >= mod) {
 				rem = newrem;
 				quot = newquot;
@@ -66,7 +69,6 @@ public class P {
 	// rating of 1: bucket 0, 1.5: bucket 1, 2: 2, 2.5: 3, etc.
 	// maps each ratings array to an avg rating bucket
 	public static int map(int[] reviews) {
-		int rating;
 		// NOTE: Got rid of totalReviews, since NUM_RATINGS has the same information
 		int sumRatings = 0;
 		// float avgReview = 0.0f, absReview, fraction, outValue = 0.0f;
@@ -75,21 +77,45 @@ public class P {
 		// NUM_RATINGS + 1 is as invalid a value for a bucket as -1 :-)
 		int bucket = NUM_RATINGS+1;
 		for (int i = 0; i < NUM_RATINGS; i++) {
-			rating = reviews[i];
-			sumRatings += rating;
+			sumRatings = sumRatings + reviews[i];
 		}
-
-		absReview = quot(sumRatings, NUM_RATINGS);
-		fraction = sumRatings % NUM_RATINGS;
+		
+		int val = sumRatings;
+		int mod = NUM_RATINGS;
+		// % ------ QUOT START -------------------
+		int quot = 0;
+		int rem = 0;
+		for (int j = LEN - 1; j >= 0; j--) {
+			// rem <<= 1
+			rem = rem << 1;
+			// rem[0] = val[j]
+			rem = rem + ((val >> j) & 1); // EMPHASIS HERE
+			
+			int newrem = rem - mod;
+			int newquot = (quot | (1 << j));
+			if(rem >= mod) {
+				rem = newrem;
+				quot = newquot;
+			}
+//			boolean flag = (rem >= mod);
+//			rem = MultiplexImpl.v().MUX(newrem, rem, flag);
+//			quot = MultiplexImpl.v().MUX(newquot, quot, flag);
+		}
+		// % ------------- QUOT END ---------------
+		absReview = quot;
+		fraction = rem;
 
 		int m = INTERVALS * (absReview - 1);
 		int num = fraction * INTERVALS;
+		// TODO: should pre-calculate interval bounds (it would make that loop parallelizable)
+		// and thereby use parallel costs. it will also mean that loop wouldn't have MUX
+		// so would make sense to convert to arithmetic
 		for (int j = 0; j < INTERVALS; j++) {
-			int low = j * sumRatings;
-			int high = (j + 1) * sumRatings;
+			int low = j * NUM_RATINGS;
+			int high = (j + 1) * NUM_RATINGS;
 //			if (low <= num && num < high) {
-//			bucket = m + j;
-//		}
+//				bucket = m + j;
+//			}
 			boolean lowerBoundFlag = (low <= num);
 			boolean upperBoundFlag = (high > num);
 			if((lowerBoundFlag && upperBoundFlag) == true) {
@@ -116,16 +142,12 @@ public class P {
 			}
 		}
 
-		/* buckets from 0 to 8 */
-		int size = INTERVALS * 5 - 1;
-		int[] result = new int[size];
-
+		int[] result = new int[NUM_BUCKETS];
 		for (int i = 0; i < NUM_REVIEWERS; i++) {
 			int bucket = map(reviews[i]);
-			for (int j = 0; j < size; j++) {
-				int newResultJ = result[j] + 1;
+			for (int j = 0; j < NUM_BUCKETS; j++) {
 				if (j == bucket) {
-					result[j] = newResultJ;
+					result[j] = result[j] + 1;
 				}
 //				result[j] = MultiplexImpl.v().MUX(result[j] + 1, result[j], (j == bucket));
 			}
@@ -133,7 +155,7 @@ public class P {
 		}
 		
 		// OUTPUT
-		for(int i = 0; i < size; i++) {
+		for(int i = 0; i < NUM_BUCKETS; i++) {
 			mpc.OUT(result[i]);
 		}
 

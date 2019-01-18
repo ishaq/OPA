@@ -4,7 +4,8 @@ interface MPCAnnotation {
 	
 	// used to mark input variables (input vars should be assigned the return value)
 	// it's a convenient method to shutup the compiler when it complains that variables 
-	// are not initialized
+	// are not initialized. it also helps in recognizing  which variables are 
+	// input variables when one is looking at shimple code.
 	public int IN();
 }
 
@@ -42,9 +43,13 @@ public class P {
 		// -- INPUT PREPROCESSING START --
 		// NONE OF THIS CODE NEEDS TO BE INSIDE MPC, CLIENT/SERVER EXECUTE IT LOCALLY
 		/* secret array of which we are looking to find a match */
-		int[] C = new int[dim];
+//		int[] C = new int[dim];
 		int[][] S = new int[size][dim];
-//		init(C, S);
+		for(int i = 0; i < size; i++) {
+			for(int j = 0; j < dim; j++) {
+				S[i][j] = mpc.IN();
+			}
+		}
 		
 
 		// now that we have S and C, compute S_sqr and C_sqr, also compute 2*C
@@ -93,11 +98,11 @@ public class P {
 		int minDiff = D[0];
 		int minIndex = 0;
 		for (int k = 1; k < size; k++) {
-			boolean flag = D[k] < minDiff;
 			if(D[k] < minDiff) {
 				minDiff = D[k];
 				minIndex = k;
 			}
+//			boolean flag = D[k] < minDiff;
 //			minDiff = mpc.MUX(D[k], minDiff, flag);
 //			minIndex = mpc.MUX(k, minIndex, flag);
 		}
