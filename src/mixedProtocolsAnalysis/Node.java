@@ -638,10 +638,10 @@ public class Node {
 
 	public String toString() {
 		String repr = "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + ", order: " + useOrder
-				+ ", weight = " + weight + ", arrayWeight: " + getArrayWeight() + ")";
+				+ ", weight = " + weight + ", arrayWeight: " + getArrayWeight() + ", parallelWeight: " + parallelParam + ")";
 		if(associatedCondition != null) {
 			repr = "(instruction = " + lineNumber + ":" + id + ", type:" + nodeType + ", order: " + useOrder
-					+ ", weight = " + weight + ", arrayWeight: " + getArrayWeight() + ")" 
+					+ ", weight = " + weight + ", arrayWeight: " + getArrayWeight() + ", parallelWeight: " + parallelParam + ")"
 					+ " associatedCondition: " + associatedCondition.getCondition();
 		}
 		return repr;

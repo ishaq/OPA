@@ -242,7 +242,6 @@ public class Analysis extends BodyTransformer {
 	}
 	
 	public void showResult() {
-
 		if (!(methodDefUses.keySet().size() > 0)) {
 			throw new RuntimeException("the results map is empty");
 		}
@@ -753,7 +752,9 @@ public class Analysis extends BodyTransformer {
 					order += 1;
 				}
 			}
-			
+//			if(usesThatHaveBeenAssignedOrder.equals(du.getUses()) == false) {
+//				System.out.println("Oops");
+//			}
 			assert(usesThatHaveBeenAssignedOrder.equals(du.getUses()));
 		}
 		

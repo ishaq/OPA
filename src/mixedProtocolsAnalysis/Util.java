@@ -313,7 +313,7 @@ public class Util {
 		
 	public static Set<Local> getTransitiveClosureForDef(DefUse du, Map<Stmt, DefUse> defUses, Loop parentLoop) {
 		
-		// corner case:
+		// corner case, when def and use are the same statement
 		if(du.uses.size() == 1) {
 			Stmt useStmt = du.uses.iterator().next().id;
 			if(du.def.id.equals(useStmt)) {

@@ -1,6 +1,9 @@
 package mixedProtocolsAnalysis;
 
 
+import java.util.Iterator;
+
+import soot.Pack;
 import soot.PackManager;
 import soot.Transform;
 
@@ -12,9 +15,23 @@ public class Main {
         long startTime = System.currentTimeMillis();
 		
         // Code hooks the Analysis then launches Soot, which traverses 
+        PackManager pm = PackManager.v();
+        Pack p = pm.getPack("stp");
+        
+//        Iterator<Transform> iterator = stp.iterator();
+//        Transform last = null;
+//        while(iterator.hasNext()) {
+//        	last = iterator.next();
+//        }
+        
+//        String phaseName = last.getPhaseName();
         Analysis analysis = new Analysis(); 
-        PackManager.v().getPack("stp").add(new Transform("stp.mixedprotocols", analysis));
-		soot.Main.main(args);
+        Transform t = new Transform("stp.mixedprotocols", analysis);
+        
+		//p.insertAfter(t, phaseName);
+        //p.insertAfter(t, "sop.cpf");
+		p.add(t);
+        soot.Main.main(args);
 
 //        String outputDir = SourceLocator.v().getOutputDir();
         

@@ -16,12 +16,13 @@ public class Tests extends TestCase {
 
 	@Test
 	public void test2() {
-		String[] args = new String[19];
+		String[] args = new String[18];
 		int largeValue = 1000000;
 		// -app causes Soot to run in "application mode", i.e., analysis scope is application 
 		// classes only, no JDK classes. For now, consider this unsound application-only analysis. 
 		// Later we will include java.* classes in the analysis. 
 		int i = 0;
+		//args[i++] = "-O";
 		//args[i++] = "-app"; // passing -app causes soot to look at all the referenced classes (except those in java.* and com.sun.*), we want it to look at classes passed in arguments only
 		// NOTE: intentionally running whole program JIMPLE (-w) instead of whole program SHIMPLE (-ws) because static inliner (wjop.si) does not
 		// work with shimple
@@ -43,10 +44,10 @@ public class Tests extends TestCase {
 		args[i++] = "-f";
 		//args[3] = "J";
 		args[i++] = "shimple";
-		args[i++] = "-O";
+		
 		// -cp specifies the class path. Must include a path to the application classes, and the rt.jar
 		args[i++] = "-cp";
-		args[i++] = "./src/programs/psi/:"+RT_HOME;
+		args[i++] = "./src/programs/playground/:"+RT_HOME;
 		// specifies the class that contains the "main" method
 		args[i++] = "P";
  		Main.main(args);

@@ -31,7 +31,7 @@ class MPCAnnotationImpl implements MPCAnnotation {
 }
 
 public class P {
-	static final int size = 100;
+	static final int size = 512;
 	static final int dim = 4;
 
 //	public static void init(int[] C, int[][] S) {
