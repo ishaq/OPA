@@ -449,7 +449,7 @@ public class Analysis extends BodyTransformer {
 					if (useL != null) {
 						if (localsToMatch.contains(useL)) {	
 							if(Util.isArrayCopyStatment((Stmt)item)) { // if this is a copy, we record it as a copy
-								thisDefUse.copies.add(defL);
+								thisDefUse.copies.add((Stmt)item);
 								localsToMatch.add(defL);
 							}
 							else {
@@ -617,15 +617,15 @@ public class Analysis extends BodyTransformer {
 			throws UnsupportedFeatureException {
 		Set<Loop> nonParallelLoops = new HashSet<Loop>();
 		LoopHelper loopHelper = new LoopHelper(body);
-		Map<Loop, Set<Local>> loopVars = loopHelper.getLoopCounterVariables(defUses);
+		Map<Loop, Set<Stmt>> loopDefs = loopHelper.getLoopCounterVariableDefStmts(defUses);
 		Set<Loop> prevLoops = new HashSet<Loop>();
 		for(Loop l: loopHelper.getLoopsTree()) {
 			Collection<Stmt> loopStatements = l.getLoopStatements();
-			Set<Local> varsToIgnore = loopVars.get(l);
+			Set<Stmt> defsToIgnore = loopDefs.get(l);
 			for(Loop prevLoop: prevLoops) {
 				Collection<Stmt> prevLoopStatements = prevLoop.getLoopStatements();
 				if(loopStatements.containsAll(prevLoopStatements)) {
-					varsToIgnore.addAll(loopVars.get(prevLoop));
+					defsToIgnore.addAll(loopDefs.get(prevLoop));
 				}
 			}
 			for(Stmt key: defUses.keySet()) {
@@ -633,17 +633,17 @@ public class Analysis extends BodyTransformer {
 					continue;
 				}
 				DefUse du = defUses.get(key);
-				if(varsToIgnore.contains(du.var)) {
+				if(defsToIgnore.contains(du.def.id)) {
 					continue;
 				}
-				Set<Local> tc = Util.getTransitiveClosureForDef(du, defUses, l);
-				if(tc.contains(du.var)) {
-					varsToIgnore.addAll(tc);
-					varsToIgnore = Util.updateVariablesToIgnore(varsToIgnore, defUses, l);
+				Set<Stmt> tc = Util.getTransitiveClosureForDef(du, defUses, l);
+				if(tc.contains(du.def.id)) {
+					defsToIgnore.addAll(tc);
+					defsToIgnore = Util.updateDefsToIgnore(defsToIgnore, defUses, l);
 					nonParallelLoops.add(l);
 				}
 			}
-			loopVars.put(l, varsToIgnore);
+			loopDefs.put(l, defsToIgnore);
 			prevLoops.add(l);
 		}
 		

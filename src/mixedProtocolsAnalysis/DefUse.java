@@ -17,7 +17,7 @@ import soot.toolkits.graph.BriefUnitGraph;
 public class DefUse {
 	protected final Local var;
 	protected Node def;
-	protected Set<Local> copies = new HashSet<Local>();
+	protected Set<Stmt> copies = new HashSet<Stmt>();
 	
 	protected final Set<Node> uses = new HashSet<Node>();
 	
@@ -46,12 +46,12 @@ public class DefUse {
 		return uses;
 	}
 	
-	public Set<Local> getCopies() {
+	public Set<Stmt> getCopies() {
 		return copies;
 	}
 	
 	public void markCopy(DefUse other) {
-		this.copies.add(other.var);
+		this.copies.add(other.def.id);
 		this.copies.addAll(other.copies);
 		removeUse(other.def);
 		this.uses.addAll(other.uses);

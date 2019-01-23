@@ -311,18 +311,18 @@ public class Util {
 		}	
 	}
 		
-	public static Set<Local> getTransitiveClosureForDef(DefUse du, Map<Stmt, DefUse> defUses, Loop parentLoop) {
+	public static Set<Stmt> getTransitiveClosureForDef(DefUse du, Map<Stmt, DefUse> defUses, Loop parentLoop) {
 		
 		// corner case, when def and use are the same statement
 		if(du.uses.size() == 1) {
 			Stmt useStmt = du.uses.iterator().next().id;
 			if(du.def.id.equals(useStmt)) {
-				return new HashSet<Local>();
+				return new HashSet<Stmt>();
 			}
 		}
 		
 		Collection<Stmt> loopStatements = parentLoop.getLoopStatements();
-		Set<Local> transitiveClosure = new HashSet<Local>();
+		Set<Stmt> transitiveClosure = new HashSet<Stmt>();
 		Queue<Node> worklist = new LinkedList<Node>();
 		Set<Node> processedWorklist = new HashSet<Node>();
 		worklist.addAll(du.uses);
@@ -339,7 +339,7 @@ public class Util {
 				continue;
 			}
 			
-			transitiveClosure.add(currentDefUse.var);
+			transitiveClosure.add(currentDefUse.def.id);
 			transitiveClosure.addAll(currentDefUse.copies);
 			
 			for(Node use: currentDefUse.uses) {
@@ -403,8 +403,8 @@ public class Util {
 			return vars;
 		}
 		// TODO: the only reason we need this case is because we are currently using
-		// Invoke Expressions for MUX. Once we start supporting if/else statements, this
-		// should be removed since our code doesn't expect calls
+		// Invoke Expressions for MPC Annotations. Once we start doing annotations through some
+		// annotation/attribute framework, this wouldn't be needed
 		else if(v instanceof InvokeExpr) {
 			Set<Local> vars = new HashSet<Local>();
 			InvokeExpr invoke = (InvokeExpr)v;
@@ -416,10 +416,18 @@ public class Util {
 		throw new UnsupportedFeatureException("Can't figure out variables for " + v);
 	}
 	
-	public static Set<Local> updateVariablesToIgnore(Set<Local> variablesToIgnore, 
-			Map<Stmt, DefUse> defUses, Loop parentLoop) throws UnsupportedFeatureException {
-		
-		// create local to def-use mapping, it would be helpful later
+//	public static Set<Stmt> getDefsForVariables(Set<Local> vars, ShimpleLocalDefs localDefs) {
+//		Set<Stmt> defs = new HashSet<Stmt>();
+//		for(Local l: vars) {
+//			Unit u = localDefs.getDefsOf(l).get(0);
+//			defs.add((Stmt)u);
+//		}
+//		return defs;
+//	}
+	
+	
+	public static Map<Local, Set<DefUse>> createDefUseMapKeyedWithLocal(Map<Stmt, DefUse> defUses) 
+			throws UnsupportedFeatureException {
 		Map<Local, Set<DefUse>> defUsesKeyedWithLocal = new HashMap<Local, Set<DefUse>>();
 		for(Stmt key: defUses.keySet()) {
 			DefUse du = defUses.get(key);
@@ -430,15 +438,53 @@ public class Util {
 			duSet.add(du);
 			defUsesKeyedWithLocal.put(du.var, duSet);
 			
-			for(Local copy: du.copies) {
-				Set<DefUse> copyDUSet = defUsesKeyedWithLocal.get(copy);
+			for(Stmt copy: du.copies) {
+				Set<Local> allLocals = getVariables(((AssignStmt)copy).getLeftOp());
+				assert(allLocals.isEmpty() == false);
+				Local copyLocal = allLocals.iterator().next();
+				Set<DefUse> copyDUSet = defUsesKeyedWithLocal.get(copyLocal);
 				if(copyDUSet == null) {
 					copyDUSet = new HashSet<DefUse>();
 				}
 				copyDUSet.add(du);
-				defUsesKeyedWithLocal.put(copy, copyDUSet);
+				defUsesKeyedWithLocal.put(copyLocal, copyDUSet);
 			}
 		}
+		return defUsesKeyedWithLocal;
+	}
+	
+	// why don't I just use ShimpleLocalDefs here? because I need a definition corresponding to the passed useStmt,
+	// in case the use is of an array, I need the array definition that corresponds to this use 
+	// (remember, array vars have multiple defs)
+	public static Stmt getDefThatCorrespondsToUse(Local local, Stmt useStmt, Map<Local, Set<DefUse>> defUseMapKeyedWithLocal) {
+		Set<DefUse> defUses = defUseMapKeyedWithLocal.get(local);
+		assert(defUses.isEmpty() == false);
+		for(DefUse du: defUses) {
+			for(Node use: du.uses) {
+				if(use.id.equals(useStmt)) {
+					return du.def.id;
+				}
+			}
+		}
+		return null;
+	}
+	
+	public static Set<Stmt> getDefsThatCorrespondToUse(Set<Local> locals, Stmt useStmt, 
+			Map<Local, Set<DefUse>> defUseKeyedWithLocal) {
+		Set<Stmt> defs = new HashSet<Stmt>();
+		for(Local l : locals) {
+			Stmt du = getDefThatCorrespondsToUse(l, useStmt, defUseKeyedWithLocal);
+			assert(du != null);
+			defs.add(du);
+		}
+		return defs;
+	}
+	
+	public static Set<Local> updateVariablesToIgnore(Set<Local> variablesToIgnore, 
+			Map<Stmt, DefUse> defUses, Loop parentLoop) throws UnsupportedFeatureException {
+		
+		// create local to def-use mapping, it would be helpful later
+		Map<Local, Set<DefUse>> defUsesKeyedWithLocal = createDefUseMapKeyedWithLocal(defUses);
 		
 		// now update ignored variables
 		Collection<Stmt> loopStatements = parentLoop.getLoopStatements();
@@ -486,6 +532,73 @@ public class Util {
 		} while(newVariables.size() > 0);
 		
 		return variablesToIgnore;
+	}
+	
+	public static Set<Stmt> updateDefsToIgnore(Set<Stmt> defsToIgnore, Map<Stmt, DefUse> defUses, 
+			Loop parentLoop) throws UnsupportedFeatureException {
+		
+		// create local to def-use mapping, it becomes handy in case of arrays, where
+		// same variable may have been defined multiple times
+		Map<Local, Set<DefUse>> defUseMapKeyedWithLocal = createDefUseMapKeyedWithLocal(defUses);
+		
+		// create a def-use map that has copies as keys too
+		// so that we can get the DefUse through one of the copies as well.
+		Map<Stmt, DefUse> defUseMapWithAllKeys = new HashMap<Stmt, DefUse>();
+		for(Stmt key: defUses.keySet()) {
+			DefUse du = defUses.get(key);
+			defUseMapWithAllKeys.put(du.def.id, du);
+			
+			for(Stmt copy: du.copies) {
+				defUseMapWithAllKeys.put(copy, du);
+			}
+		}
+		
+		// now update ignored defs
+		Collection<Stmt> loopStatements = parentLoop.getLoopStatements();
+		Set<Stmt> newDefs = new HashSet<Stmt>();
+		do {
+			newDefs.clear();
+			for(Stmt s: defsToIgnore) {
+				if(!loopStatements.contains(s)) {
+					continue;
+				}
+				DefUse du = defUseMapWithAllKeys.get(s);
+				assert(du != null);
+				for(Node use: du.uses) {
+					if(!loopStatements.contains(use.id)) {
+						continue;
+					}
+					
+					// is this use actually another def?
+					if((use.id instanceof AssignStmt) == false) {
+						// no, we don't want to keep looking at it
+						continue;
+					}
+					
+					AssignStmt assign = (AssignStmt)use.id;
+					Set<Local> rightOpVars = getVariables(assign.getRightOp());
+					Set<Stmt> rightOpVarDefs = getDefsThatCorrespondToUse(rightOpVars, use.id, defUseMapKeyedWithLocal);
+					boolean allRightOpDefsShouldBeIgnored = true;
+					for(Stmt thisDef: rightOpVarDefs) {
+						
+						if(!defsToIgnore.contains(thisDef)) {
+							allRightOpDefsShouldBeIgnored = false;
+							break;
+						}
+					}
+					
+					if(allRightOpDefsShouldBeIgnored) {
+						// then the def should also be ignored
+						if(!defsToIgnore.contains(assign)) {
+							newDefs.add(assign);
+						}
+					}
+				}
+			}
+			defsToIgnore.addAll(newDefs);
+		} while(newDefs.size() > 0);
+		
+		return defsToIgnore;
 	}
 	
 	/**

@@ -176,6 +176,26 @@ public class LoopHelper {
 		return loopCounterVars;
 	}
 	
+	public Map<Loop, Set<Stmt>> getLoopCounterVariableDefStmts(Map<Stmt, DefUse> defUses) throws UnsupportedFeatureException {
+		Map<Loop, Set<Stmt>> loopCounterDefs = new HashMap<Loop, Set<Stmt>>();
+		Iterator<Loop> iter = loopsTree.iterator();
+		while(iter.hasNext()) {
+			Loop l = iter.next();
+			Set<Stmt> thisLoopCounterDefs = getLoopCounterVariableDefStmts(l, defUses);
+			Collection<Stmt> thisLoopStatements = l.getLoopStatements();
+			for(Loop prevLoop: loopCounterDefs.keySet()) {
+				Collection<Stmt> prevLoopStatements = prevLoop.getLoopStatements();
+				if(thisLoopStatements.containsAll(prevLoopStatements)) {
+					Set<Stmt> prevLoopVars = loopCounterDefs.get(prevLoop);
+					thisLoopCounterDefs.addAll(prevLoopVars);
+				}
+			}
+			
+			loopCounterDefs.put(l, thisLoopCounterDefs);
+		}
+		return loopCounterDefs;
+	}
+	
 	public Set<Local> getLoopCounterVariables(Loop l, Map<Stmt, DefUse> defUses) throws UnsupportedFeatureException {
 		Set<Local> thisLoopCounterVars = new HashSet<Local>();
 		Iterator<Stmt> iter = l.getLoopStatements().iterator();
@@ -201,6 +221,33 @@ public class LoopHelper {
 		return thisLoopCounterVars;
 	}
 	
+	public Set<Stmt> getLoopCounterVariableDefStmts(Loop l, Map<Stmt, DefUse> defUses) throws UnsupportedFeatureException {
+		Map<Local, Set<DefUse>> defUseKeyedWithLocal = Util.createDefUseMapKeyedWithLocal(defUses);
+		Set<Stmt> thisLoopCounterVarDefs = new HashSet<Stmt>();
+		Iterator<Stmt> iter = l.getLoopStatements().iterator();
+		while(iter.hasNext()) {
+			Stmt s = iter.next();
+			if(s instanceof IfStmt) {
+				IfStmt ifStmt = (IfStmt)s;
+				ConditionExpr cond = (ConditionExpr) ifStmt.getCondition();
+				Set<Local> condVariables = Util.getVariables(cond);
+				Set<Stmt> condVariableDefs = Util.getDefsThatCorrespondToUse(condVariables, ifStmt, defUseKeyedWithLocal);
+				thisLoopCounterVarDefs.addAll(condVariableDefs);
+				
+				for(Stmt s1: condVariableDefs) {
+					AssignStmt assign = (AssignStmt)s1;
+					Set<Local> assignRightOpVars = Util.getVariables(assign.getRightOp());
+					Set<Stmt> assignRightOpVarDefs = Util.getDefsThatCorrespondToUse(assignRightOpVars, s1, defUseKeyedWithLocal);
+					thisLoopCounterVarDefs.addAll(assignRightOpVarDefs);
+				}
+				break;
+			}
+		}
+		
+		thisLoopCounterVarDefs = Util.updateDefsToIgnore(thisLoopCounterVarDefs, defUses, l);
+		return thisLoopCounterVarDefs;
+	}
+	
 	public Set<Local> getAllLoopCounterVariables(Map<Stmt, DefUse> defUses) throws UnsupportedFeatureException {
 		Set<Local> loopCounterVars = new HashSet<Local>();
 		for(Loop l: this.loopsTree) {
@@ -211,11 +258,10 @@ public class LoopHelper {
 	}
 	
 	public Set<Stmt> getAllLoopCounterVariableDefStmts(Map<Stmt, DefUse> defUses) throws UnsupportedFeatureException {
-		Set<Local> loopCounterVars = getAllLoopCounterVariables(defUses);
 		Set<Stmt> loopCounterVarDefs = new HashSet<Stmt>();
-		for(Local l: loopCounterVars) {
-			Unit u = localDefs.getDefsOf(l).get(0);
-			loopCounterVarDefs.add((Stmt)u);
+		for(Loop l: this.loopsTree) {
+			Set<Stmt> defs = getLoopCounterVariableDefStmts(l, defUses);
+			loopCounterVarDefs.addAll(defs);
 		}
 		return loopCounterVarDefs;
 	}
