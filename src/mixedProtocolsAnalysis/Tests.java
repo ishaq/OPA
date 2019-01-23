@@ -47,7 +47,7 @@ public class Tests extends TestCase {
 		
 		// -cp specifies the class path. Must include a path to the application classes, and the rt.jar
 		args[i++] = "-cp";
-		args[i++] = "./src/programs/biometric/:"+RT_HOME;
+		args[i++] = "./src/programs/psi/:"+RT_HOME;
 		// specifies the class that contains the "main" method
 		args[i++] = "P";
  		Main.main(args);

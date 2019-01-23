@@ -103,7 +103,7 @@ public class Analysis extends BodyTransformer {
 			TypeToken<Local> localType = new TypeToken<Local>() {
 			};
 			obj.add("var", ctx.serialize(src.getVar(), localType.getType()));
-			TypeToken<Set<Local>> copiesType = new TypeToken<Set<Local>>() {
+			TypeToken<Set<Stmt>> copiesType = new TypeToken<Set<Stmt>>() {
 			};
 			obj.add("copies", ctx.serialize(src.getCopies(), copiesType.getType()));
 			TypeToken<Node> nodeType = new TypeToken<Node>() {

@@ -41,6 +41,9 @@ public class P {
 			if(haystack[i] == needle) {
 				result = 1;
 			}
+			else {
+				result = 0;
+			}
 		}
 		return result;
 	}

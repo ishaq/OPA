@@ -29,7 +29,6 @@ public class LoopHelper {
 	protected static int DEFAULT_LOOP_ITERATIONS = Integer.MAX_VALUE;
 	protected LoopNestTree loopsTree = null;
 	ShimpleLocalDefs localDefs = null;
-	protected Set<IfStmt> ifStmtOwnedByLoops = new HashSet<IfStmt>();
 	
 	LoopHelper(Body b) throws UnsupportedFeatureException {
 		if(!(b instanceof ShimpleBody)) {
@@ -101,10 +100,8 @@ public class LoopHelper {
 	
 	public void setConversionPoint(Node def, Node use) throws UnsupportedFeatureException, RuntimeException {
 		Loop defLoop = getImmediateParentLoop(def.id);
-		//def.weight = guessLoopIterationsIncludingParentLoops(defLoop);
 		
 		Loop useLoop = getImmediateParentLoop(use.id);
-		//use.weight = guessLoopIterationsIncludingParentLoops(useLoop);
 		
 		Loop ancestor = getCommonAncestor(defLoop, useLoop);
 		Loop secondOldestAncestorOfUse = getSecondOldestAncestor(use.id, ancestor);
@@ -113,13 +110,24 @@ public class LoopHelper {
 		}
 		else {
 			use.setConversionPoint(secondOldestAncestorOfUse.getHead());
-		}
-		
-		//use.conversionWeight = guessLoopIterationsIncludingParentLoops(ancestor);				
+		}			
 	}
 	
 	public Set<IfStmt> getIfStmtsOwnedByLoops() {
-		return this.ifStmtOwnedByLoops;
+		Set<IfStmt> loopIfs = new HashSet<IfStmt>();
+		for(Loop l: loopsTree) {
+			Iterator<Stmt> stmtIt = l.getLoopStatements().iterator();
+			while(stmtIt.hasNext()) {
+				Stmt s = stmtIt.next();
+				if(s instanceof IfStmt) {
+					IfStmt ifStmt = (IfStmt) s;
+					loopIfs.add(ifStmt);
+					break;
+				}
+			}
+		}
+		
+		return loopIfs;
 	}
 	
 	public Loop getImmediateParentLoop(Stmt stmt) {
@@ -288,26 +296,6 @@ public class LoopHelper {
 	}
 	
 	/**
-	 * tries to figure out number of iterations of the passed loop. if the loop is
-	 * nested inside other loops, it multiples parents' iterations too
-	 * 
-	 * @param l the loop to guess iterations of, may be null
-	 * @return guessed (total) iterations
-	 * @throws UnsupportedFeatureException, RuntimeException
-	 */
-	private int guessLoopIterationsIncludingParentLoops(Loop l) throws UnsupportedFeatureException, RuntimeException {
-		int guessedIterations = 1;
-		while(l != null) {
-			int x = guessLoopIterations(l);
-			guessedIterations = multiplyLoopIterations(guessedIterations, x);
-			
-			l = getImmediateParentLoop(l);
-		}
-		
-		return guessedIterations;
-	}
-	
-	/**
 	 * tries to figure out number of iterations of the passed loop 
 	 * 
 	 * NOTE: that it only tries to guess iterations of the passed loop itself, 
@@ -327,7 +315,6 @@ public class LoopHelper {
 			Stmt s = stmtIt.next();
 			if(s instanceof IfStmt) {
 				IfStmt ifStmt = (IfStmt) s;
-				this.ifStmtOwnedByLoops.add(ifStmt);
 				ConditionExpr cond = (ConditionExpr) ifStmt.getCondition();
 				Value op1 = cond.getOp1();
 				Value op2 = cond.getOp2();
@@ -363,14 +350,5 @@ public class LoopHelper {
 	
 	private int guessLoopUpperBoundValue(Value upperBound) throws UnsupportedFeatureException, RuntimeException {
 		return Util.guessConcreteValue(upperBound, this.localDefs);
-	}
-	
-	
-	
-	private static int multiplyLoopIterations(int l1, int l2) {
-		if(l1 == Integer.MAX_VALUE || l2 == Integer.MAX_VALUE) {
-			return Integer.MAX_VALUE;
-		}
-		return l1 * l2;
 	}
 }

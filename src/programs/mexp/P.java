@@ -31,7 +31,7 @@ class MPCAnnotationImpl implements MPCAnnotation {
 }
 
 public class P {
-	static final int len = 64;
+	static final int len = 32;
 
 	public static int rem(int x, int y) {
 		int rem = 0;
