@@ -9,3 +9,5 @@
 *.json
 *.shimple
 /bin/
+*.txt
+*.md
