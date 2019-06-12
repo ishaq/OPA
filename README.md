@@ -10,6 +10,7 @@ Follow the examples in `src/programs` directory in eclipse project directory. Br
 
 * only contain very simple `if` statements (current support for analyzing `if` is a simple heuristic.)
 * loops should have statically known bounds (this is a standard limitation of MPC).
+* only contain `public static` functions.
 * input and output variables should be marked using function calls to `MPCAnnotation`. This ensures that such variables do not get eliminated as dead code during analysis.
 
 ## LICENSE
