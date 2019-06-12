@@ -51,14 +51,12 @@ public class P {
 			rem = rem + ((val >> j) & 1); // EMPHASIS HERE
 			
 			int newrem = rem - mod;
+			// quot[j] = 1;
 			int newquot = (quot | (1 << j));
 			if(rem >= mod) {
 				rem = newrem;
 				quot = newquot;
 			}
-//			boolean flag = (rem >= mod);
-//			rem = MultiplexImpl.v().MUX(newrem, rem, flag);
-//			quot = MultiplexImpl.v().MUX(newquot, quot, flag);
 		}
 		return quot;
 	}
@@ -92,14 +90,12 @@ public class P {
 			rem = rem + ((val >> j) & 1); // EMPHASIS HERE
 			
 			int newrem = rem - mod;
+			// quot[j] = 1
 			int newquot = (quot | (1 << j));
 			if(rem >= mod) {
 				rem = newrem;
 				quot = newquot;
 			}
-//			boolean flag = (rem >= mod);
-//			rem = MultiplexImpl.v().MUX(newrem, rem, flag);
-//			quot = MultiplexImpl.v().MUX(newquot, quot, flag);
 		}
 		// % ------------- QUOT END ---------------
 		absReview = quot;
@@ -113,16 +109,31 @@ public class P {
 		for (int j = 0; j < INTERVALS; j++) {
 			int low = j * NUM_RATINGS;
 			int high = (j + 1) * NUM_RATINGS;
-//			if (low <= num && num < high) {
-//				bucket = m + j;
-//			}
-			boolean lowerBoundFlag = (low <= num);
-			boolean upperBoundFlag = (high > num);
-			if((lowerBoundFlag && upperBoundFlag) == true) {
-				bucket = m + j;
+			int cond1;
+			if(low <= num) {
+				cond1 = 1;
 			}
-
-//			bucket = MultiplexImpl.v().MUX(j + m, bucket, betweenBoundsFlag);
+			else {
+				cond1 = 0;
+			}
+			int cond2;
+			if(high > num) {
+				cond2 = 1;
+			}
+			else {
+				cond2 = 0;
+			}
+			int cond = cond1 + cond2;
+			
+			int newBucket;
+			if(cond == 2) {
+				newBucket = m + j;
+			}
+			else {
+				newBucket = bucket;
+			}
+			
+			bucket = newBucket;
 		}
 
 		return bucket;
@@ -146,10 +157,14 @@ public class P {
 		for (int i = 0; i < NUM_REVIEWERS; i++) {
 			int bucket = map(reviews[i]);
 			for (int j = 0; j < NUM_BUCKETS; j++) {
+				int temp;
 				if (j == bucket) {
-					result[j] = result[j] + 1;
+					temp = result[j] + 1;
 				}
-//				result[j] = MultiplexImpl.v().MUX(result[j] + 1, result[j], (j == bucket));
+				else {
+					temp = result[j];
+				}
+				result[j] = temp;
 			}
 
 		}

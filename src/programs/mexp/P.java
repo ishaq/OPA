@@ -43,11 +43,6 @@ public class P {
 			if (rem >= y) {
 				rem = rem - y;
 			}
-//			
-//			boolean lt = (rem < y);
-//			int rem2 = rem - y;
-//			rem = mpc.MUX(rem, rem2, lt);
-
 		}
 		return rem;
 	}
@@ -78,8 +73,6 @@ public class P {
 			if (int_flag != 0) {
 				res = cnd_mul;
 			}
-//    		boolean flag = int_flag != 0;
-//    		res = mpc.MUX(cnd_mul, res, flag);
 		}
 		mpc.OUT(res);
 	}

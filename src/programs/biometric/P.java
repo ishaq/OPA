@@ -34,10 +34,6 @@ public class P {
 	static final int size = 512;
 	static final int dim = 4;
 
-//	public static void init(int[] C, int[][] S) {
-//		// TODO: fill in C and S
-//	}
-
 	public static void main(String[] args) {
 		MPCAnnotation mpc = MPCAnnotationImpl.v();
 		// -- INPUT PREPROCESSING START --
@@ -51,7 +47,6 @@ public class P {
 			}
 		}
 		
-
 		// now that we have S and C, compute S_sqr and C_sqr, also compute 2*C
 		int[] S_sqr = new int[size];
 //		for (int i = 0; i < size; i++) {
@@ -98,13 +93,18 @@ public class P {
 		int minDiff = D[0];
 		int minIndex = 0;
 		for (int k = 1; k < size; k++) {
+			int newMinDiff = 0;
+			int newMinIndex = 0;
 			if(D[k] < minDiff) {
 				minDiff = D[k];
 				minIndex = k;
 			}
-//			boolean flag = D[k] < minDiff;
-//			minDiff = mpc.MUX(D[k], minDiff, flag);
-//			minIndex = mpc.MUX(k, minIndex, flag);
+			else {
+				newMinDiff = minDiff;
+				newMinIndex = minIndex;
+			}
+			minDiff = newMinDiff;
+			minIndex = newMinIndex;
 		}
 		// -- MPC PORTION END --
 		

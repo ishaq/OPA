@@ -30,10 +30,9 @@ class MPCAnnotationImpl implements MPCAnnotation {
 	}
 }
 
-
 public class P {
-	static final int SIZE1 = 10; // alice/client
-	static final int SIZE2 = 500; // bob/server
+	static final int SIZE1 = 32; // alice/client
+	static final int SIZE2 = 1024; // bob/server
 	
 	public static int contains(int[] haystack, int needle, int haystack_size) {
 		int result = 0;

@@ -248,14 +248,25 @@ public class Node {
 					secondRunner = second;
 			while(firstRunner != null && secondRunner != null) {
 				firstRunner = df.getImmediateDominator(firstRunner);
-				if(firstRunner instanceof IfStmt && df.isDominatedBy(second, firstRunner)) {
-					divergenceCondition = (IfStmt)firstRunner;
+				if(firstRunner instanceof IfStmt && df.isDominatedBy(second, firstRunner)) { // TODO: check there is no other if statement between
+					if(isThereAnIfConditionBefore(df, firstRunner, second)) {
+						divergenceCondition = null; 
+					}
+					else {
+						divergenceCondition = (IfStmt)firstRunner;
+					}
 					break;
 				}
 				
 				secondRunner = df.getImmediateDominator(secondRunner);
-				if(secondRunner instanceof IfStmt && df.isDominatedBy(first, secondRunner)) {
-					divergenceCondition = (IfStmt)secondRunner;
+				if(secondRunner instanceof IfStmt && df.isDominatedBy(first, secondRunner)) { // TODO: check there is no other if statement between
+					// we do not handle nested ifs
+					if(isThereAnIfConditionBefore(df, secondRunner, first)) {
+						divergenceCondition = null; 
+					}
+					else {
+						divergenceCondition = (IfStmt)secondRunner;
+					}
 					break;
 				}
 			}
@@ -274,6 +285,21 @@ public class Node {
 				// (instead of an if/else), this Phi is not a MUX (in the paper we call these pseudo-phi nodes).
 				this.nodeType = NodeType.PSEUDO_PHI;
 			}
+		}
+		
+		private boolean isThereAnIfConditionBefore(DominatorsFinder<Unit> df, Unit theIfStmt, Unit dominatee) {
+			Unit runner = dominatee;
+			while(runner != null) {
+				runner = df.getImmediateDominator(runner);
+				if(runner.equals(theIfStmt)) {
+					return false;
+				}
+				if(runner instanceof IfStmt) {
+					return true;
+				}
+			}
+			
+			return false;
 		}
 
 		// From AbstractJimpleValueSwitch

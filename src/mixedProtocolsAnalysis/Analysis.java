@@ -27,6 +27,7 @@ import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 
 import mixedProtocolsAnalysis.Node.NodeType;
+import soot.ArrayType;
 import soot.Body;
 import soot.BodyTransformer;
 import soot.Local;
@@ -34,6 +35,7 @@ import soot.PatchingChain;
 import soot.SootMethod;
 import soot.Unit;
 import soot.BooleanType;
+import soot.jimple.ArrayRef;
 import soot.jimple.AssignStmt;
 import soot.jimple.IfStmt;
 import soot.jimple.Stmt;
@@ -210,6 +212,7 @@ public class Analysis extends BodyTransformer {
 				Map<Stmt, DefUse> defUses = collectDefUses(body);
 				patchDefUsesForMUXNodes(body, defUses);
 				Map<Stmt, DefUse> arrayDefUses = collectArrayDefUses(body);
+				defUses = doCopyPropagation(defUses);
 				
 				// merge update def-use map
 				Map<Stmt, DefUse> defUsesWithFixedArrayDefUse = new HashMap<Stmt, DefUse>();
@@ -217,7 +220,6 @@ public class Analysis extends BodyTransformer {
 				defUsesWithFixedArrayDefUse.putAll(arrayDefUses);
 				defUses = defUsesWithFixedArrayDefUse;
 				
-				defUses = doCopyPropagation(defUses);
 				defUses = updateUseOrder(body, defUses, nodeToIndex);
 				defUses = removeUsesThatOccurAfterRedefinition(body, defUses, 
 						nodeToIndex);
@@ -569,7 +571,15 @@ public class Analysis extends BodyTransformer {
 			if ((assignStmt.getRightOp() instanceof Local) == false) {
 				continue;
 			}
+			if((assignStmt.getLeftOp().getType() instanceof ArrayType) || 
+					assignStmt.getRightOp().getType() instanceof ArrayType) {
+				// if we have found an array copy statement, we just remove it (we assume
+				// this would be taken care of by the array def-use collection code anyway).
+				toRemove.add(du.def.id);
+				continue;
+			}
 			Local rightOpLocal = (Local)assignStmt.getRightOp();
+			
 			DefUse rightOpDefUse = null;
 			// find def use corresponding to the right side local
 			for(Stmt rightKey: defUses.keySet()) {
@@ -752,9 +762,6 @@ public class Analysis extends BodyTransformer {
 					order += 1;
 				}
 			}
-//			if(usesThatHaveBeenAssignedOrder.equals(du.getUses()) == false) {
-//				System.out.println("Oops");
-//			}
 			assert(usesThatHaveBeenAssignedOrder.equals(du.getUses()));
 		}
 		

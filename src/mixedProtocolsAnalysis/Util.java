@@ -74,6 +74,7 @@ public class Util {
 			if(seenLocals.contains(var)) {
 				// a cycle, that means the first value of this variable comes from some other place
 				// hence, this variable can't affect the upper bound anyway
+				//throw new UnsupportedFeatureException("can't figure out value for " + var);
 				return Integer.MIN_VALUE;
 			}
 			seenLocals.add(var);
@@ -101,9 +102,20 @@ public class Util {
 				Value op1 = op.getOp1();
 				Value op2 = op.getOp2();
 				int val1 = guessConcreteValue(op1, seenLocals, localDefs);
-				int val2 = guessConcreteValue(op2, seenLocals, localDefs);
-				if(val1 == Integer.MAX_VALUE || val2 == Integer.MAX_VALUE) { return Integer.MAX_VALUE; }
-				if(val1 == Integer.MIN_VALUE || val2 == Integer.MIN_VALUE) { return Integer.MIN_VALUE; }
+				int val2;
+				if(op1.equals(op2)) {
+					val2 = val1;
+				}
+				else {
+					val2 = guessConcreteValue(op2, seenLocals, localDefs);
+				}
+				if(val1 == Integer.MAX_VALUE || val2 == Integer.MAX_VALUE) 
+				{ 
+					return Integer.MAX_VALUE; 
+				}
+				if(val1 == Integer.MIN_VALUE || val2 == Integer.MIN_VALUE) { 
+					return Integer.MIN_VALUE; 
+				}
 				if(op instanceof AddExpr) {
 					
 					return val1 + val2;
@@ -158,8 +170,18 @@ public class Util {
 //		System.out.println("WARNING!!! Couldn't guess number of iterations for " + upperBound + ", you might want to check the loop");
 //		return DEFAULT_LOOP_ITERATIONS;	
 	}
-	
-	public static ArrayList<Integer> getArraySizes(Unit s, ShimpleLocalDefs localDefs) throws UnsupportedFeatureException, RuntimeException {
+	public static ArrayList<Integer> getArraySizes(Unit s, ShimpleLocalDefs localDefs)
+			throws UnsupportedFeatureException, RuntimeException {
+		ArrayList<Integer> sizes = getArraySizes(s, localDefs, false);
+		for(int d : sizes) {
+			if(d < 1) {
+				throw new UnsupportedFeatureException("can't figure out array sizes for " + s.toString());
+			}
+		}
+		return sizes;
+	}
+	public static ArrayList<Integer> getArraySizes(Unit s, ShimpleLocalDefs localDefs, boolean internalCall)
+			throws UnsupportedFeatureException, RuntimeException {
 		AssignStmt assign = (AssignStmt)s;
 		if(assign.getRightOp() instanceof NewArrayExpr) {
 			NewArrayExpr newArrayExpr = (NewArrayExpr)((AssignStmt)s).getRightOp();
@@ -182,7 +204,7 @@ public class Util {
 			ArrayRef arrayRef = (ArrayRef)((AssignStmt)s).getRightOp();
 			Local l = (Local) arrayRef.getBase();
 			Unit def = localDefs.getDefsOf(l).get(0);
-			ArrayList<Integer> sizes = getArraySizes(def, localDefs);
+			ArrayList<Integer> sizes = getArraySizes(def, localDefs, true);
 			// since this array is skipping one dimension, we should also skip one dimension
 			sizes.remove(0);
 			return sizes;
@@ -192,11 +214,11 @@ public class Util {
 			ArrayRef arrayRef = (ArrayRef)((AssignStmt)s).getLeftOp();
 			Local l = (Local) arrayRef.getBase();
 			Unit def = localDefs.getDefsOf(l).get(0);
-			ArrayList<Integer> sizes = getArraySizes(def, localDefs);
+			ArrayList<Integer> sizes = getArraySizes(def, localDefs, true);
 			return sizes;
 		}
-		// NOTE: array copy statement should never occur because the array
-		// def-use collection code should take care of it internally.
+		// NOTE: array copy statement should never occur from an outside call (i.e. the check for
+		// internal call) because the array def-use collection code should take care of it internally.
 		// if an array copy slips through array def-use collection, it will never 
 		// go away (the copyPropagation code which does simple local variable matching
 		// cannot handle it properly). e.g. consider this
@@ -211,15 +233,16 @@ public class Util {
 		// but this is semantically wrong, r1 has two definitions (1) and (2)
 		// it is a copy of the 2nd one.
 		
-//		else if(assign.getLeftOp() instanceof Local // array copy statement
-//				&& assign.getLeftOp().getType() instanceof ArrayType
-//				&& assign.getRightOp() instanceof Local
-//				&& assign.getRightOp().getType() instanceof ArrayType) {
-//			Local l = (Local)assign.getRightOp();
-//			Unit def = localDefs.getDefsOf(l).get(0);
-//			ArrayList<Integer> sizes = getArraySizes(def, localDefs);
-//			return sizes;
-//		}
+		else if(internalCall == true
+				&& assign.getLeftOp() instanceof Local // array copy statement
+				&& assign.getLeftOp().getType() instanceof ArrayType
+				&& assign.getRightOp() instanceof Local
+				&& assign.getRightOp().getType() instanceof ArrayType) {
+			Local l = (Local)assign.getRightOp();
+			Unit def = localDefs.getDefsOf(l).get(0);
+			ArrayList<Integer> sizes = getArraySizes(def, localDefs, true);
+			return sizes;
+		}
 		
 		throw new UnsupportedFeatureException("Unknown array init statement: " + s);
 	}
@@ -401,6 +424,10 @@ public class Util {
 			vars.addAll(getVariables(arg1));
 			vars.addAll(getVariables(arg2));
 			return vars;
+		}
+		else if(v instanceof NewArrayExpr) {
+			NewArrayExpr expr = (NewArrayExpr)v;
+			return getVariables(expr.getSize());
 		}
 		// TODO: the only reason we need this case is because we are currently using
 		// Invoke Expressions for MPC Annotations. Once we start doing annotations through some

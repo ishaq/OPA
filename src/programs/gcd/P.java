@@ -44,11 +44,6 @@ public class P {
 			if (rem >= y) {
 				rem = rem2;
 			}
-
-//			boolean lt = (rem < y);
-//			int rem2 = rem - y;
-//			rem = mpc.MUX(rem, rem2, lt);
-
 		}
 		return rem;
 	}
@@ -60,24 +55,12 @@ public class P {
 
 		int gcd = 0;
 		for (int i = 0; i < len; i++) {
-//    		if (b != 0) {
-//    			int t = b;
-//    			b = rem(a, b);
-//    			a = t;
-//    		}
-
 			gcd = rem(a, b);
 			int temp = b;
 			if (b != 0) {
 				b = gcd;
 				a = temp;
 			}
-
-			// rem = a % b;
-//			boolean neq = (b != 0);
-//			int temp = b;
-//			b = mpc.MUX(gcd, b, neq);
-//			a = mpc.MUX(temp, a, neq);
 		}
 
 		mpc.OUT(gcd);
