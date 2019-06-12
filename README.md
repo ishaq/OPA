@@ -16,4 +16,7 @@ Follow the examples in `src/programs` directory in eclipse project directory. Br
 ## LICENSE
 MIT License. see `LICENSE` for details.
 
+## Troublelshooting
+* If running analysis (whether through eclipse or commandline) gives you `unable to load java.lang.CharSequence` (or similar) error. Try running the analysis on a compiled `.class` file instead of java souce. Soot's java frontend is outdated and running it against compiled program fixes many issues.
+
 
