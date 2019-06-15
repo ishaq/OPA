@@ -12,10 +12,15 @@ import junit.framework.TestCase;
 public class Tests extends TestCase {
 	
 	// jce.jar is required when doing whole program optimization (we run static inliner, which is a whole program pack)
-	private static String RT_HOME = "/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/jce.jar";
+	// private static String RT_HOME = "/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar:/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/jce.jar";
+
+	// Lindsey: changed RT_HOME to point to my home, hid value.
+	private static String JAVA_HOME = System.getenv("JAVA_HOME");
+	private static String RT_HOME = String.format("%s\\jre\\lib\\rt.jar;%s\\jre\\lib\\jce.jar", JAVA_HOME, JAVA_HOME);
 
 	@Test
 	public void test2() {
+
 		String[] args = new String[18];
 		int largeValue = 1000000;
 		// -app causes Soot to run in "application mode", i.e., analysis scope is application 
@@ -47,7 +52,7 @@ public class Tests extends TestCase {
 		
 		// -cp specifies the class path. Must include a path to the application classes, and the rt.jar
 		args[i++] = "-cp";
-		args[i++] = "./src/programs/kmeans/:"+RT_HOME;
+		args[i++] = "./src/programs/kmeans/;"+RT_HOME;
 		// specifies the class that contains the "main" method
 		args[i++] = "P";
  		Main.main(args);
