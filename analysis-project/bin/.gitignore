@@ -1,3 +1,11 @@
-/main/
+# Ignore Gradle project-specific cache directory
+.gradle
+
+sootOutput
+
+analysis.json
+
+# Ignore Gradle build output directory
+build
 /test/
-/default/
+/main/

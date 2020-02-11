@@ -29,12 +29,6 @@ repositories {
     jcenter()
 }
 
-
-// sourceSets.test.resources {
-//     srcDirs = ["src/test/java"]
-//     exclude "src/test/resources"
-// }
-
 dependencies {
     // This dependency is used by the application.
     implementation 'com.google.guava:guava:28.1-jre'
