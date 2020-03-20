@@ -8,8 +8,8 @@
 % the file containing analysis output
 clear % we *always* want to start from a clean slate, otherwise it can give us garbage
 
-analysis_file = 'biometric/analysis.json';
-costs_file = 'costs-LAN.json';
+analysis_file = 'mexp/analysis.json';
+costs_file = 'total-costs-sim-lan-network-saturated.json';
 bit_length = 32; % Un-used now, but eventually when costs file will contain
 % costs for multiple bitlengths, This param will specify the bitlength for
 % which we want the solver to calculate optimal assignment, the solver will
@@ -257,6 +257,7 @@ function [summary_assignment, summary_cost, num_conversions] = print_output(x, f
     protocol1_insts = 0;
     protocol2_insts = 0;
     global non_mpc_node_cost;
+    num_gates = 0;
     for k = 1:num_nodes
         %fprintf('nodes_vector[%d] = %d, a: %d, u: %d\n', k, nodes_vector(k), 2*k-1, 2*k);
         a_k = (2*k) - 1;
@@ -264,6 +265,7 @@ function [summary_assignment, summary_cost, num_conversions] = print_output(x, f
         
         node_idx = nodes_vector(k);
         node = node_lookup(node_idx);
+        num_gates = num_gates + node.weight;
         method = '';
         node_cost = 0;
         if(x(a_k)==1 && x(y_k)==1)
@@ -295,7 +297,7 @@ function [summary_assignment, summary_cost, num_conversions] = print_output(x, f
             fprintf('%s: [%d:%s, cost: %d, w: %d, par:%d] %s\n', method, node_idx, node.node_type, node_cost, node.weight, node.parallel_param, node.unit);
         end
     end
-
+    fprintf('Total Nodes (Linearized) %d \n', num_gates);
     fprintf('\nEDGES:\n');
     col = 1;
     conversions_needed = 0;
@@ -420,26 +422,26 @@ function cost = get_cost2(protocol, node_type, parallel_param, json_costs)
     % 		// AbstractShimpleValueSwitch
     % 		MUX(301);
     costs_map = containers.Map('KeyType', 'char', 'ValueType', 'char');
-    costs_map('ADD') = 'zi_add';
-    costs_map('AND') = 'zi_and';
+    costs_map('ADD') = 'add';
+    costs_map('AND') = 'and';
     costs_map('CMP') = ''; % not supported
     costs_map('DIV') = ''; % not supported
-    costs_map('EQ') = 'zi_eq';
-    costs_map('GE') = 'zi_ge';
-    costs_map('GT') = 'zi_gt';
-    costs_map('LE') = 'zi_le';
-    costs_map('LT') = 'zi_lt';
-    costs_map('MUL') = 'zi_mul';
-    costs_map('NE') = 'zi_ne';
-    costs_map('OR') = 'zi_or';
-    costs_map('REM') = 'zi_rem';
-    costs_map('SHL') = 'zi_shl';
-    costs_map('SHR') = 'zi_shr'; % signed shift is not supported, we'll just assume this is an unsigned shift
-    costs_map('SUB') = 'zi_sub';
-    costs_map('USHR') = 'zi_shr';
-    costs_map('XOR') = 'zi_xor';
+    costs_map('EQ') = 'eq';
+    costs_map('GE') = 'ge';
+    costs_map('GT') = 'gt';
+    costs_map('LE') = 'le';
+    costs_map('LT') = 'lt';
+    costs_map('MUL') = 'mul';
+    costs_map('NE') = 'ne';
+    costs_map('OR') = 'or';
+    costs_map('REM') = 'rem';
+    costs_map('SHL') = 'shl';
+    costs_map('SHR') = 'shr'; % signed shift is not supported, we'll just assume this is an unsigned shift
+    costs_map('SUB') = 'sub';
+    costs_map('USHR') = 'shr';
+    costs_map('XOR') = 'xor';
     costs_map('NEG') = ''; % not supported
-    costs_map('MUX') = 'zi_mux';
+    costs_map('MUX') = 'mux';
     
     if(isKey(costs_map, node_type) == false)
         error('%s is not a key in costs_map\n', node_type);
@@ -475,12 +477,12 @@ function cost = get_conversion_cost(from_protocol, to_protocol, array_weight, ..
         return;
     end
     conversion_costs_map = containers.Map('KeyType', 'char', 'ValueType', 'char');
-    conversion_costs_map('a2b') = 'zic_a2b';
-    conversion_costs_map('a2y') = 'zic_a2y';
-    conversion_costs_map('b2a') = 'zic_b2a';
-    conversion_costs_map('b2y') = 'zic_b2y';
-    conversion_costs_map('y2a') = 'zic_y2a';
-    conversion_costs_map('y2b') = 'zic_y2b';
+    conversion_costs_map('a2b') = 'a2b';
+    conversion_costs_map('a2y') = 'a2y';
+    conversion_costs_map('b2a') = 'b2a';
+    conversion_costs_map('b2y') = 'b2y';
+    conversion_costs_map('y2a') = 'y2a';
+    conversion_costs_map('y2b') = 'y2b';
     
     key = char(from_protocol + "2" + to_protocol);
     if(isKey(conversion_costs_map, key) == false)
@@ -500,6 +502,7 @@ end
 
 function cost = get_appropriate_cost(parallel_param, costs_array)
     if(parallel_param == 1)
+        %display(costs_array);
         cost = costs_array.('x1');
         %fprintf('node is not parallelizable, therefore cost is %s\n', cost);
         return
