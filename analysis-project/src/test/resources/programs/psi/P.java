@@ -9,11 +9,12 @@ public class P {
 	public static int contains(int[] haystack, int needle, int haystack_size) {
 		int result = 0;
 		for(int i = 0; i < haystack_size; i++) {
+			int old_result = result;
 			if(haystack[i] == needle) {
 				result = 1;
 			}
 			else {
-				result = 0;
+				result = old_result;
 			}
 		}
 		return result;

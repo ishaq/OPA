@@ -68,8 +68,8 @@ public class P {
 			int newMinDiff = 0;
 			int newMinIndex = 0;
 			if(D[k] < minDiff) {
-				minDiff = D[k];
-				minIndex = k;
+				newMinDiff = D[k];
+				newMinIndex = k;
 			}
 			else {
 				newMinDiff = minDiff;
