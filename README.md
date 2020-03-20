@@ -8,9 +8,9 @@ This repo contains companinion code for the ACM CCS'19 paper **Efficient MPC via
 ### How to Run
 1. Analysis project needs to know the classpath (option `-cp`) and class name (option `-c`) of the program to generate anlaysis file for. It uses defaults for  the path of `rt.jar` (option `-r`) and `jce.jar` (option `-j`). If those default values are wrong, it will complain and you'll have to specify those paths on command line too.
 
-	To generate analysis for, for exmaple, the gcd benchmark, run:
+	To generate analysis for, for example, the gcd benchmark, run:
 	```bash
-	./gradlew run --args='-c P -cp ./src/tests/resources/programs/gcd' 
+	./gradlew run --args='-c P -cp ./src/test/resources/programs/gcd' 
 	```
 
 	You can change the `-c` and `-cp` params to other benchmarks to test them. Analysis output is written to `analysis.json`.

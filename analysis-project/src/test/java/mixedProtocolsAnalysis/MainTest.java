@@ -10,6 +10,6 @@ import mixedProtocolsAnalysis.Main;
 public class MainTest {
     @Test public void testSanity()  {
 		Main m = new Main();
-		m.performAnalysis("./src/test/resources/programs/playground/", "P");
+		m.performAnalysis("./src/test/resources/programs/gcd/", "P");
 	}
 }
