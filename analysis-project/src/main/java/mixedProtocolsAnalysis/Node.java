@@ -247,8 +247,7 @@ public class Node {
 			Unit firstRunner = first,
 					secondRunner = second;
 			while(firstRunner != null && secondRunner != null) {
-				firstRunner = df.getImmediateDominator(firstRunner);
-				if(firstRunner instanceof IfStmt && df.isDominatedBy(second, firstRunner)) { // TODO: check there is no other if statement between
+				if(firstRunner instanceof IfStmt && df.isDominatedBy(second, firstRunner)) {
 					if(isThereAnIfConditionBefore(df, firstRunner, second)) {
 						divergenceCondition = null; 
 					}
@@ -258,8 +257,7 @@ public class Node {
 					break;
 				}
 				
-				secondRunner = df.getImmediateDominator(secondRunner);
-				if(secondRunner instanceof IfStmt && df.isDominatedBy(first, secondRunner)) { // TODO: check there is no other if statement between
+				if(secondRunner instanceof IfStmt && df.isDominatedBy(first, secondRunner)) { 
 					// we do not handle nested ifs
 					if(isThereAnIfConditionBefore(df, secondRunner, first)) {
 						divergenceCondition = null; 
@@ -269,6 +267,8 @@ public class Node {
 					}
 					break;
 				}
+				firstRunner = df.getImmediateDominator(firstRunner);
+				secondRunner = df.getImmediateDominator(secondRunner);
 			}
 			
 			if(divergenceCondition != null) {
