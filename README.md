@@ -5,6 +5,10 @@ This repo contains companinion code for the ACM CCS'19 paper **Efficient MPC via
 * **analysis-project** contains a gradle java project for analysis (you need to have gradle installed to build/run analysis project). 
 * **solver** contains OPA solver MATLAB code.
 
+### Prerequisits
+* Java SDK 8 (`openjdk-8-sdk`)
+
+
 ### How to Run
 1. Analysis project needs to know the classpath (option `-cp`) and class name (option `-c`) of the program to generate anlaysis file for. It uses defaults for  the path of `rt.jar` (option `-r`) and `jce.jar` (option `-j`). If those default values are wrong, it will complain and you'll have to specify those paths on command line too.
 

@@ -8,8 +8,8 @@
 % the file containing analysis output
 clear % we *always* want to start from a clean slate, otherwise it can give us garbage
 
-analysis_file = 'mexp/analysis.json';
-costs_file = 'total-costs-sim-lan-network-saturated.json';
+analysis_file = 'biometric/analysis.json';
+costs_file = 'sample-costs.json';
 bit_length = 32; % Un-used now, but eventually when costs file will contain
 % costs for multiple bitlengths, This param will specify the bitlength for
 % which we want the solver to calculate optimal assignment, the solver will
